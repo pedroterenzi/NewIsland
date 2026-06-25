@@ -22,7 +22,7 @@ def inicializar_banco():
         conn = psycopg2.connect(DATABASE_URL)
         cursor = conn.cursor()
         
-        # MIGRAÇÃO INTELIGENTE: Detecta schema antigo e limpa para recriar as tabelas perfeitas
+        # Sincronização e migração do schema
         cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name='codigos_parada' AND column_name='maquina';")
         if cursor.fetchone():
             cursor.execute("DROP TABLE IF EXISTS result_by_order, stop_machine_item, registro_turnos, codigos_parada, master_sku, tipos_tno, maquinas CASCADE;")
@@ -53,7 +53,7 @@ def inicializar_banco():
             for tno in tnos:
                 cursor.execute("INSERT INTO tipos_tno (nome) VALUES (%s) ON CONFLICT (nome) DO NOTHING;", (tno,))
 
-        # 4. SKUs
+        # 4. SKUs (Catálogo Mestre Unicharm)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS master_sku (
                 id SERIAL PRIMARY KEY, codigo_sku VARCHAR(100) UNIQUE NOT NULL, descricao VARCHAR(255),
@@ -65,16 +65,13 @@ def inicializar_banco():
             skus_carga = [
                 ('1000', 'RN-TESTE', 4, 63, 18), ('2000', 'P-TESTE', 4, 48, 18), ('3000', 'M-TESTE', 1, 120, 18), 
                 ('4000', 'G-TESTE', 1, 120, 18), ('5000', 'XG-TESTE', 1, 100, 18), ('6000', 'XXG-TESTE', 1, 100, 18),
-                ('11151', 'P50 IGUAÇU', 50, 4, 25), ('12111', 'M20 IGUAÇU', 20, 6, 30), ('12121', 'G17 IGUAÇU', 17, 6, 36), 
-                ('12131', 'XG15 IGUAÇU', 15, 6, 36), ('12141', 'P24 Cuidado Real', 24, 6, 24), ('12151', 'XXG13 IGUAÇU', 13, 6, 32),
-                ('12161', 'M18 IGUAÇU', 18, 6, 36), ('12171', 'G16 IGUAÇU', 16, 6, 30), ('12181', 'XG14 IGUAÇU', 14, 6, 36),
-                ('12191', 'XXG12 IGUAÇU', 12, 6, 32), ('12201', 'P22 IGUAÇU', 22, 6, 30), ('12301', 'RN20 D&N', 20, 6, 30),
-                ('13101', 'G28 D&N', 28, 4, 32), ('13201', 'XG24 D&N', 24, 4, 32), ('13301', 'XXG22 SP', 22, 4, 36),
-                ('13401', 'M34 SP', 34, 4, 30), ('14101', 'M34 Super Proteção', 34, 4, 30), ('14201', 'M18 Super Proteção', 18, 6, 36),
-                ('21111', 'RG 20 PAD', 20, 6, 24), ('32321', 'G30 CR Pelé', 30, 4, 30), ('32131', 'XG26 CR Senna', 26, 4, 36)
+                ('7801084', 'P50 IGUAÇU', 50, 4, 25), ('7801000', 'M20 IGUAÇU', 20, 6, 30), ('7801087', 'M58 IGUAÇU', 58, 4, 15), 
+                ('7801130', 'M34 D&N', 34, 4, 30), ('7801133', 'M1 D&N', 1, 60, 36), ('7801138', 'M68 D&N', 68, 2, 33),
+                ('7801001', 'G17 IGUAÇU', 17, 6, 36), ('7801088', 'G50 IGUAÇU', 50, 4, 20), ('7801093', 'G64 D&N', 32, 4, 27), 
+                ('7801131', 'G30 D&N', 30, 4, 30), ('7801134', 'G1 D&N', 1, 60, 36), ('7801139', 'G60 D&N', 60, 2, 33)
             ]
             for s in skus_carga:
-                cursor.execute("INSERT INTO master_sku (codigo_sku, descricao, fraldas_por_pacote, pacotes_por_fardo, fardos_por_pallet) VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING;", s)
+                cursor.execute("INSERT INTO master_sku (codigo_sku, descricao, fraldas_por_pacote, pacotes_por_fardo, fardos_por_pallet) VALUES (%s, %s, %s, %s, %s) ON CONFLICT (codigo_sku) DO NOTHING;", s)
 
         # 5. Códigos de Parada
         cursor.execute("""
@@ -86,27 +83,21 @@ def inicializar_banco():
         cursor.execute("SELECT COUNT(*) FROM codigos_parada;")
         if cursor.fetchone()[0] == 0:
             paradas_baby = [
-                ('1', 'Problemas no triturador (mill) - Absorção'), ('2', 'Linha do Pulp - Absorção'), ('3', 'Alimentador de polímero - Absorção'),
-                ('4', 'Esteira transportadora - Absorção'), ('5', 'Pattern drum - Absorção'), ('6', 'Linha do Core /Tissue - Absorção'),
-                ('11', 'Linha Inner Film'), ('12', 'Linha Center Top'), ('13', 'Linha LSG NW'), ('25', 'LSG 1º Sailor'),
-                ('40', 'Linha 2 dobras'), ('41', 'Sonic'), ('53', 'VH - Corte'), ('58', 'R Cutter - Corte'),
-                ('61', 'Parte de trás geral Correia, polia'), ('65', 'Erro humano(trabalho operador)'), ('67', 'HMA Tank A - Cola'),
-                ('89', 'Emenda do Pulp'), ('101', 'OPTIMA STACKER'), ('115', 'Esteira de embalagem'), ('120', 'Detector de metais'),
-                ('124', 'Defeito no material (SAP)')
+                ('1', 'Problemas no triturador (mill)'), ('2', 'Linha do Pulp'), ('3', 'Alimentador de polímero'),
+                ('11', 'Linha Inner Film'), ('12', 'Linha Center Top'), ('13', 'Linha LSG NW'),
+                ('41', 'Sonic'), ('53', 'VH - Corte'), ('58', 'R Cutter - Corte'), ('101', 'OPTIMA STACKER')
             ]
             for num, prob in paradas_baby:
                 cursor.execute("INSERT INTO codigos_parada (tipo_maquina, numero, problema) VALUES ('baby_care', %s, %s) ON CONFLICT DO NOTHING;", (num, prob))
 
             paradas_adult = [
                 ('1', 'Problemas no triturador (mill)'), ('2', 'Linha do Pulp'), ('6', 'Envolvimento do tissue na absorção'),
-                ('7', 'Core press'), ('11', 'Linha do tissue'), ('12', 'Linha inner back film'), ('40', 'Sonic'),
-                ('56', 'VH - Corte'), ('65', 'Erro Humano (operador)'), ('67', 'HMA TANK A'), ('83', 'Emenda Pulp'), 
-                ('93', 'Optima Stacker')
+                ('40', 'Sonic'), ('56', 'VH - Corte'), ('93', 'Optima Stacker')
             ]
             for num, prob in paradas_adult:
                 cursor.execute("INSERT INTO codigos_parada (tipo_maquina, numero, problema) VALUES ('adult_care', %s, %s) ON CONFLICT DO NOTHING;", (num, prob))
 
-        # 6. Tabelas de Apontamento
+        # 6. Movimentações de Turno
         cursor.execute("CREATE TABLE IF NOT EXISTS registro_turnos (id SERIAL PRIMARY KEY, data_registro DATE NOT NULL, turno INT NOT NULL, operador VARCHAR(255) NOT NULL, maquina_numero INT NOT NULL);")
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS result_by_order (
@@ -121,15 +112,11 @@ def inicializar_banco():
         conn.commit()
         cursor.close()
         conn.close()
-        print("⚡ Infraestrutura Industrial Unicharm recriada com sucesso!")
-    except Exception as e:
-        print(f"❌ Erro na inicialização: {str(e)}")
+    except Exception as e: print(f"❌ Erro banco: {str(e)}")
 
 inicializar_banco()
 
-# ==========================================
-# MODELOS DE ENTRADA (PYDANTIC)
-# ==========================================
+# Schemas Pydantic
 class ModelAuth(BaseModel): login: str; senha: str
 class ModelUsuario(BaseModel): login: str; senha: str; nome: str; nivel: int
 class ModelSKU(BaseModel): codigo_sku: str; descricao: str; fraldas_por_pacote: int; pacotes_por_fardo: int; fardos_por_pallet: int
@@ -141,10 +128,6 @@ class OrdemProducao(BaseModel): ordem: str; codigo_sku: str; horario_padrao: int
 class ParadaTurno(BaseModel): numero_parada: str; minutos_parados: int
 class PayloadApontamento(BaseModel): data_registro: str; turno: int; operador: str; maquina: int; ordens: List[OrdemProducao]; paradas: List[ParadaTurno]
 
-# ==========================================
-# ROTAS DA API
-# ==========================================
-
 @app.post("/usuarios/auth")
 def autenticar(obj: ModelAuth):
     login = obj.login.strip().lower()
@@ -154,10 +137,9 @@ def autenticar(obj: ModelAuth):
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         cursor.execute("SELECT login, nome, nivel FROM usuarios WHERE login = %s AND senha = %s;", (login, obj.senha))
         user = cursor.fetchone()
-        cursor.close()
-        conn.close()
         if user: return user
     except Exception: pass
+    finally: conn.close()
     raise HTTPException(status_code=401, detail="Usuário ou senha inválidos")
 
 @app.get("/dados-mestres")
@@ -173,26 +155,23 @@ def obter_dados_mestres():
         tnos = cursor.fetchall()
         cursor.execute("SELECT * FROM maquinas ORDER BY numero_maquina ASC;")
         maquinas = cursor.fetchall()
-        cursor.close()
-        conn.close()
         return {"skus": skus, "paradas": paradas, "tnos": tnos, "maquinas": maquinas}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+    finally: conn.close()
 
 @app.post("/apontamentos")
 def salvar_apontamento(dados: PayloadApontamento):
     cargas = {1: 455, 2: 440, 3: 415}
     tempo_turno = cargas.get(dados.turno, 440)
-
     soma_hp = sum(o.horario_padrao for o in dados.ordens)
     soma_rt = sum(o.run_time for o in dados.ordens)
     soma_tno = sum(o.tempo_tno for o in dados.ordens)
     soma_paradas = sum(p.minutos_parados for p in dados.paradas)
 
     if (soma_hp + soma_tno) != tempo_turno:
-        raise HTTPException(status_code=400, detail=f"A soma do Horário Padrão + TNO resultou em {soma_hp + soma_tno}m. O esperado é {tempo_turno}m.")
+        raise HTTPException(status_code=400, detail=f"Bloqueio: Soma Horário Padrão ({soma_hp}m) + TNO ({soma_tno}m) deve fechar em {tempo_turno}m.")
     if (soma_hp - soma_rt) != soma_paradas:
-        raise HTTPException(status_code=400, detail=f"Inconsistência: HP - Run Time resultou em {soma_hp - soma_rt}m, mas o total de paradas é {soma_paradas}m.")
+        raise HTTPException(status_code=400, detail=f"Bloqueio: Inconsistência. HP ({soma_hp}m) - Run Time ({soma_rt}m) deve ser igual às paradas apontadas ({soma_paradas}m).")
 
     try:
         conn = psycopg2.connect(DATABASE_URL)
@@ -204,7 +183,6 @@ def salvar_apontamento(dados: PayloadApontamento):
             cursor.execute("SELECT fraldas_por_pacote, pacotes_por_fardo, fardos_por_pallet FROM master_sku WHERE codigo_sku = %s;", (o.codigo_sku,))
             sku = cursor.fetchone()
             fraldas, pacotes, fardos_pallet = sku if sku else (0, 0, 0)
-            
             total_fardos = (o.pallets * fardos_pallet) + o.fardos_avulsos
             total_pecas = total_fardos * pacotes * fraldas
             taxa_mov = (o.run_time / o.horario_padrao * 100) if o.horario_padrao > 0 else 0
@@ -217,95 +195,21 @@ def salvar_apontamento(dados: PayloadApontamento):
 
         for p in dados.paradas:
             cursor.execute("INSERT INTO stop_machine_item (turno_id, numero_parada, minutos_parados) VALUES (%s, %s, %s);", (turno_id, p.numero_parada, p.minutos_parados))
-
-        conn.commit()
-        return {"status": "sucesso"}
-    except Exception as e:
-        if 'conn' in locals(): conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if 'cursor' in locals(): cursor.close()
-        if 'conn' in locals(): conn.close()
-
-# ROTAS DO ADMIN (CRUD)
-@app.post("/admin/skus")
-def adicionar_sku(s: ModelSKU):
-    try:
-        conn = psycopg2.connect(DATABASE_URL)
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO master_sku (codigo_sku, descricao, fraldas_por_pacote, pacotes_por_fardo, fardos_por_pallet) VALUES (%s, %s, %s, %s, %s);", 
-                      (s.codigo_sku, s.descricao, s.fraldas_por_pacote, s.pacotes_por_fardo, s.fardos_por_pallet))
         conn.commit()
         return {"status": "sucesso"}
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if 'cursor' in locals(): cursor.close()
-        if 'conn' in locals(): conn.close()
+    finally: conn.close()
 
-@app.post("/admin/maquinas")
-def adicionar_maquina(m: ModelMaquina):
-    try:
-        conn = psycopg2.connect(DATABASE_URL)
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO maquinas (numero_maquina, tipo) VALUES (%s, %s);", (m.numero_maquina, m.tipo))
-        conn.commit()
-        return {"status": "sucesso"}
-    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if 'cursor' in locals(): cursor.close()
-        if 'conn' in locals(): conn.close()
-
-@app.post("/admin/tnos")
-def adicionar_tno(t: ModelTNOMestre):
-    try:
-        conn = psycopg2.connect(DATABASE_URL)
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO tipos_tno (nome) VALUES (%s);", (t.nome,))
-        conn.commit()
-        return {"status": "sucesso"}
-    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if 'cursor' in locals(): cursor.close()
-        if 'conn' in locals(): conn.close()
-
-@app.post("/admin/paradas")
-def adicionar_codigo_parada_mestre(p: ModelParadaMestre):
-    try:
-        conn = psycopg2.connect(DATABASE_URL)
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO codigos_parada (tipo_maquina, numero, problema) VALUES (%s, %s, %s);", (p.tipo_maquina, p.numero, p.problema))
-        conn.commit()
-        return {"status": "sucesso"}
-    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if 'cursor' in locals(): cursor.close()
-        if 'conn' in locals(): conn.close()
-
-@app.post("/admin/usuarios")
-def adicionar_usuario(u: ModelUsuario):
-    try:
-        conn = psycopg2.connect(DATABASE_URL)
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO usuarios (login, senha, nome, nivel) VALUES (%s, %s, %s, %s);", (u.login, u.senha, u.nome, u.nivel))
-        conn.commit()
-        return {"status": "sucesso"}
-    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if 'cursor' in locals(): cursor.close()
-        if 'conn' in locals(): conn.close()
-
+# HISTÓRICO E ROTAS COMPLETAS DE CRUD/EDIÇÃO DO ADMIN
 @app.get("/historico-lancamentos")
 def listar_historico():
     try:
         conn = psycopg2.connect(DATABASE_URL)
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         cursor.execute("SELECT r.id, r.data_registro::text, r.turno, r.operador, r.maquina_numero, (SELECT COALESCE(SUM(machine_counter),0) FROM result_by_order WHERE turno_id = r.id) as total_mc FROM registro_turnos r ORDER BY r.data_registro DESC, r.turno ASC;")
-        dados = cursor.fetchall()
-        return dados
+        return cursor.fetchall()
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if 'cursor' in locals(): cursor.close()
-        if 'conn' in locals(): conn.close()
+    finally: conn.close()
 
 @app.delete("/historico-lancamentos/{id}")
 def deletar_lancamento(id: int):
@@ -316,6 +220,179 @@ def deletar_lancamento(id: int):
         conn.commit()
         return {"status": "removido"}
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if 'cursor' in locals(): cursor.close()
-        if 'conn' in locals(): conn.close()
+    finally: conn.close()
+
+@app.get("/admin/usuarios")
+def listar_usuarios():
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("SELECT id, login, nome, nivel FROM usuarios WHERE login != 'admin' ORDER BY nome ASC;")
+        return cursor.fetchall()
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+    finally: conn.close()
+
+@app.post("/admin/skus")
+def adicionar_sku(s: ModelSKU):
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO master_sku (codigo_sku, descricao, fraldas_por_pacote, pacotes_por_fardo, fardos_por_pallet) VALUES (%s, %s, %s, %s, %s);", (s.codigo_sku, s.descricao, s.fraldas_por_pacote, s.pacotes_por_fardo, s.fardos_por_pallet))
+        conn.commit()
+        return {"status": "sucesso"}
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+    finally: conn.close()
+
+@app.put("/skus/{id}")
+def modificar_sku(id: int, s: ModelSKU):
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor()
+        cursor.execute("UPDATE master_sku SET codigo_sku=%s, descricao=%s, fraldas_por_pacote=%s, pacotes_por_fardo=%s, fardos_por_pallet=%s WHERE id=%s;", (s.codigo_sku, s.descricao, s.fraldas_por_pacote, s.pacotes_por_fardo, s.fardos_por_pallet, id))
+        conn.commit()
+        return {"status": "atualizado"}
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+    finally: conn.close()
+
+@app.delete("/skus/{id}")
+def deletar_sku(id: int):
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM master_sku WHERE id = %s;", (id,))
+        conn.commit()
+        return {"status": "removido"}
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+    finally: conn.close()
+
+@app.post("/admin/maquinas")
+def adicionar_maquina(m: ModelMaquina):
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO maquinas (numero_maquina, tipo) VALUES (%s, %s);", (m.numero_maquina, m.tipo))
+        conn.commit()
+        return {"status": "sucesso"}
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+    finally: conn.close()
+
+@app.put("/admin/maquinas/{id}")
+def modificar_maquina(id: int, m: ModelMaquina):
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor()
+        cursor.execute("UPDATE maquinas SET numero_maquina=%s, tipo=%s WHERE id=%s;", (m.numero_maquina, m.tipo, id))
+        conn.commit()
+        return {"status": "atualizado"}
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+    finally: conn.close()
+
+@app.delete("/admin/maquinas/{id}")
+def deletar_maquina(id: int):
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM maquinas WHERE id = %s;", (id,))
+        conn.commit()
+        return {"status": "removido"}
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+    finally: conn.close()
+
+@app.post("/admin/tnos")
+def adicionar_tno(t: ModelTNOMestre):
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO tipos_tno (nome) VALUES (%s);", (t.nome,))
+        conn.commit()
+        return {"status": "sucesso"}
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+    finally: conn.close()
+
+@app.put("/admin/tnos/{id}")
+def modificar_tno(id: int, t: ModelTNOMestre):
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor()
+        cursor.execute("UPDATE tipos_tno SET nome=%s WHERE id=%s;", (t.nome, id))
+        conn.commit()
+        return {"status": "atualizado"}
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+    finally: conn.close()
+
+@app.delete("/admin/tnos/{id}")
+def deletar_tno(id: int):
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM tipos_tno WHERE id = %s;", (id,))
+        conn.commit()
+        return {"status": "removido"}
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+    finally: conn.close()
+
+@app.post("/admin/paradas")
+def adicionar_codigo_parada_mestre(p: ModelParadaMestre):
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO codigos_parada (tipo_maquina, numero, problema) VALUES (%s, %s, %s);", (p.tipo_maquina, p.numero, p.problema))
+        conn.commit()
+        return {"status": "sucesso"}
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+    finally: conn.close()
+
+@app.put("/paradas-codigos/{id}")
+def modificar_codigo_parada_mestre(id: int, p: ModelParadaMestre):
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor()
+        cursor.execute("UPDATE codigos_parada SET tipo_maquina=%s, numero=%s, problema=%s WHERE id=%s;", (p.tipo_maquina, p.numero, p.problema, id))
+        conn.commit()
+        return {"status": "atualizado"}
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+    finally: conn.close()
+
+@app.delete("/paradas-codigos/{id}")
+def deletar_codigo_parada_mestre(id: int):
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM codigos_parada WHERE id = %s;", (id,))
+        conn.commit()
+        return {"status": "removido"}
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+    finally: conn.close()
+
+@app.post("/admin/usuarios")
+def adicionar_usuario(u: ModelUsuario):
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO usuarios (login, senha, nome, nivel) VALUES (%s, %s, %s, %s);", (u.login, u.senha, u.nome, u.nivel))
+        conn.commit()
+        return {"status": "sucesso"}
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+    finally: conn.close()
+
+@app.put("/admin/usuarios/{id}")
+def modificar_usuario(id: int, u: ModelUsuario):
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor()
+        cursor.execute("UPDATE usuarios SET login=%s, senha=%s, nome=%s, nivel=%s WHERE id=%s;", (u.login.strip().lower(), u.senha, u.nome, u.nivel, id))
+        conn.commit()
+        return {"status": "atualizado"}
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+    finally: conn.close()
+
+@app.delete("/admin/usuarios/{id}")
+def deletar_usuario(id: int):
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM usuarios WHERE id = %s;", (id,))
+        conn.commit()
+        return {"status": "removido"}
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+    finally: conn.close()
