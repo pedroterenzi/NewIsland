@@ -45,7 +45,6 @@ async function inicializarPainel() {
     document.getElementById('menu-navegacao').classList.remove('escondido');
     document.getElementById('txt-user').innerText = `Colaborador: ${usuarioLogado.nome}`;
 
-    // Controle de exibição do menu baseado no nível
     if (parseInt(usuarioLogado.nivel) >= 2) {
         document.querySelectorAll('.restrito-lider-adm').forEach(el => el.classList.remove('escondido'));
     } else {
@@ -74,7 +73,6 @@ function preencherSeletoresIniciais() {
     const selMq = document.getElementById('ap-maquina');
     selMq.innerHTML = MESTRE_MAQUINAS.map(m => `<option value="${m.numero_maquina}">${m.numero_maquina}</option>`).join('');
     
-    // Reset da tela de apontamentos
     document.getElementById('container-ordens').innerHTML = '';
     document.getElementById('container-paradas').innerHTML = '';
     contadorOrdens = 0; contadorParadas = 0;
@@ -87,7 +85,6 @@ function atualizarRegrasDeMaquina() {
     const mqInfo = MESTRE_MAQUINAS.find(m => String(m.numero_maquina) === String(mqNumero));
     const tipoMaquina = mqInfo ? mqInfo.tipo : 'baby_care';
 
-    // Atualiza dinamicamente os selects de parada na tela do operador
     document.querySelectorAll('.select-parada-dinamica').forEach(select => {
         const valorSalvo = select.value;
         select.innerHTML = '<option value="">Selecione o Código</option>';
@@ -130,7 +127,7 @@ function adicionarOrdem() {
                 <div class="form-group"><label>Tempo TNO (m):</label><input type="number" class="op-tempo-tno" value="0" oninput="calcularResumo()"></div>
             </div>
             <div style="font-size:12px; color: var(--success-color); font-weight:bold; margin-top:5px;" id="ordem-calc-${contadorOrdens}">Estoque Calculado: 0 peças | Mov: 0% | Loss: 0%</div>
-            <button class="btn-danger-small" onclick="removerItem('ordem-${contadorOrdens}')">Remover OP</button>
+            <button class="btn-small-delete" style="margin-top:10px;" onclick="removerItem('ordem-${contadorOrdens}')">Remover OP</button>
         </div>`;
     container.insertAdjacentHTML('beforeend', html);
     atualizarDescricaoSku(contadorOrdens);
@@ -145,7 +142,7 @@ function adicionarParada() {
                 <div class="form-group"><label>Código do Defeito:</label><select class="input-parada-cod select-parada-dinamica"></select></div>
                 <div class="form-group"><label>Minutos:</label><input type="number" class="input-parada-min" value="0" oninput="calcularResumo()"></div>
             </div>
-            <button class="btn-danger-small" onclick="removerItem('parada-${contadorParadas}')">Remover Código</button>
+            <button class="btn-small-delete" style="margin-top:5px;" onclick="removerItem('parada-${contadorParadas}')">Remover Código</button>
         </div>`;
     container.insertAdjacentHTML('beforeend', html);
     atualizarRegrasDeMaquina();
@@ -160,18 +157,13 @@ function atualizarDescricaoSku(idCard) {
     calcularResumo();
 }
 
-// ==========================================
-// CÁLCULOS DOS CARDS E TRAVAS EM TEMPO REAL
-// ==========================================
-
 function calcularResumo() {
     const turno = parseInt(document.getElementById('ap-turno').value);
     const temposTurno = {1: 455, 2: 440, 3: 415};
-    const cargaExigida = temposTurnos[turno] || 440;
+    const cargaExigida = temposTurno[turno] || 440;
 
     let totalMC = 0, totalPecasEstoque = 0, totalHP = 0, totalRT = 0, totalTNO = 0, totalParadas = 0;
 
-    // Processamento matemático de cada card de Ordem de Produção
     document.querySelectorAll("[id^='ordem-']").forEach(div => {
         const idCard = div.id.split('-')[1];
         const skuCod = div.querySelector('.op-sku').value;
@@ -203,7 +195,6 @@ function calcularResumo() {
 
     document.querySelectorAll('.input-parada-min').forEach(el => totalParadas += parseInt(el.value || 0));
 
-    // Atualização dos Painéis de KPI superiores
     document.getElementById('card-mc').innerText = totalMC.toLocaleString();
     document.getElementById('card-pecas').innerText = totalPecasEstoque.toLocaleString();
     document.getElementById('card-mov').innerText = totalHP > 0 ? `${((totalRT / totalHP) * 100).toFixed(1)}%` : '0%';
@@ -211,7 +202,6 @@ function calcularResumo() {
     document.getElementById('card-tno').innerText = `${totalTNO}m`;
     document.getElementById('card-paradas').innerText = `${totalParadas}m`;
 
-    // Atualização da caixa de Trava Visual
     document.getElementById('res-carga').innerText = `${cargaExigida}m`;
     const tempoTotalApontado = totalHP + totalTNO;
     const elResTotal = document.getElementById('res-total');
@@ -280,10 +270,6 @@ async function enviarApontamento() {
     finally { btn.innerText = "Gravar Apontamento de Turno"; }
 }
 
-// ==========================================
-// FUNÇÕES DO PAINEL GERENCIAL (ADMIN)
-// ==========================================
-
 function navegarPara(idAba) {
     document.getElementById('tela-operador').classList.add('escondido');
     document.getElementById('tela-admin').classList.add('escondido');
@@ -317,7 +303,7 @@ async function carregarHistoricoAdmin() {
                             <strong>Data: ${l.data_registro.split('-').reverse().join('/')} | Turno ${l.turno} | Mq ${l.maquina_numero}</strong><br>
                             <span style="font-size:11px; color:var(--text-muted);">Apontado por: ${l.operador} | Counter Total: ${parseFloat(l.total_mc).toLocaleString()}</span>
                         </div>
-                        <button class="btn-danger-small" onclick="deletarHistorico(${l.id})">Excluir</button>
+                        <button class="btn-small-delete" onclick="deletarHistorico(${l.id})">Excluir</button>
                     </div>`;
             });
         }
