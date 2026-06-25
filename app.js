@@ -11,59 +11,47 @@ async function executarLogin() {
     if (!login || !senha) return alert("Insira suas credenciais.");
     
     const btn = document.getElementById('btn-entrar'); 
-    btn.innerText = "Conectando ao banco... (pode levar 50s)"; btn.disabled = true;
+    btn.innerText = "Conectando ao banco..."; 
+    btn.disabled = true;
 
-    let tentativas = 0;
-    while(tentativas < 2) {
-        try {
-            const res = await fetch(`${API_URL}/usuarios/auth`, {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ login, senha })
-            });
-            if (res.ok) {
-                usuarioLogado = await res.json();
-                await inicializarPainel();
-                return;
+    try {
+        const res = await fetch(`${API_URL}/usuarios/auth`, {
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ login, senha })
+        });
+        
+        if (res.ok) {
+            usuarioLogado = await res.json();
+            btn.innerText = "Sincronizando Dados...";
+            
+            // Tenta baixar as listas do banco, se falhar tenta de novo silenciosamente.
+            const dadosCarregados = await baixarDadosMestres();
+            
+            if(dadosCarregados) {
+                inicializarPainel();
             } else {
-                alert("Credenciais incorretas.");
-                btn.innerText = "Entrar no Sistema"; btn.disabled = false;
-                return;
+                alert("Falha ao sincronizar o catálogo com a nuvem. Verifique sua conexão e tente novamente.");
+                btn.innerText = "Entrar no Sistema"; 
+                btn.disabled = false;
             }
-        } catch (e) {
-            tentativas++;
-            if(tentativas >= 2) {
-                alert("Erro de conexão persistente. Verifique sua internet ou tente novamente.");
-            } else {
-                await new Promise(r => setTimeout(r, 3000));
-            }
+        } else {
+            alert("Credenciais incorretas.");
+            btn.innerText = "Entrar no Sistema"; 
+            btn.disabled = false;
         }
+    } catch (e) {
+        alert("O servidor gratuito pode estar despertando. Aguarde alguns segundos e clique novamente!");
+        btn.innerText = "Entrar no Sistema"; 
+        btn.disabled = false;
     }
-    btn.innerText = "Entrar no Sistema"; btn.disabled = false;
 }
 
 function sair() { location.reload(); }
 
-async function inicializarPainel() {
-    document.getElementById('tela-login').classList.add('escondido');
-    document.getElementById('menu-navegacao').classList.remove('escondido');
-    
-    document.getElementById('txt-user').innerText = `Operador: ${usuarioLogado.nome}`;
-    if (parseInt(usuarioLogado.nivel) >= 2) {
-        document.querySelectorAll('.restrito-lider-adm').forEach(el => el.classList.remove('escondido'));
-    }
-    const inputData = document.getElementById('ap-data');
-    if (inputData) inputData.value = new Date().toISOString().split('T')[0];
-
-    // Aqui o App vai baixar os dados e recarregar a tela automaticamente
-    await baixarDadosMestres();
-    preencherSeletoresIniciais();
-    navegarPara('operador');
-}
-
-// CORREÇÃO: Função com tentativa silenciosa automática (Auto-Retry)
 async function baixarDadosMestres() {
     let tentativas = 0;
-    while (tentativas < 3) {
+    while(tentativas < 3) {
         try {
             const res = await fetch(`${API_URL}/dados-mestres`);
             if (res.ok) {
@@ -73,18 +61,34 @@ async function baixarDadosMestres() {
                 MESTRE_TNOS = data.tnos || [];
                 MESTRE_MAQUINAS = data.maquinas || [];
                 MESTRE_USUARIOS = data.usuarios || [];
-                return; // Se deu certo, sai da função
+                return true; // Sucesso, libera a tela!
             }
         } catch (e) {
-            console.warn("Tentativa de carregar dados falhou. Retentando em segundo plano...");
+            console.log("Tentando contato com banco...");
         }
         tentativas++;
-        await new Promise(r => setTimeout(r, 1500)); // Espera 1.5s antes de tentar de novo
+        await new Promise(r => setTimeout(r, 1500));
     }
-    console.error("Falha ao sincronizar dados mestres com o servidor.");
+    return false;
 }
 
-// ================= NAVEGAÇÃO =================
+function inicializarPainel() {
+    document.getElementById('tela-login').classList.add('escondido');
+    document.getElementById('menu-navegacao').classList.remove('escondido');
+    
+    document.getElementById('txt-user').innerText = `Operador: ${usuarioLogado.nome}`;
+    if (parseInt(usuarioLogado.nivel) >= 2) {
+        document.querySelectorAll('.restrito-lider-adm').forEach(el => el.classList.remove('escondido'));
+    }
+    
+    const inputData = document.getElementById('ap-data');
+    if (inputData) inputData.value = new Date().toISOString().split('T')[0];
+
+    preencherSeletoresIniciais();
+    navegarPara('operador');
+}
+
+// ================= NAVEGAÇÃO E MODAIS =================
 function navegarPara(idAba) {
     document.querySelectorAll('.aba-conteudo').forEach(el => el.classList.add('escondido'));
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('ativo'));
@@ -107,10 +111,12 @@ function fecharModal(id) { document.getElementById(id).classList.add('escondido'
 // ================= TELA APONTAMENTO =================
 function preencherSeletoresIniciais() {
     const selMq = document.getElementById('ap-maquina');
-    if (MESTRE_MAQUINAS.length > 0) {
-        selMq.innerHTML = MESTRE_MAQUINAS.filter(m => m.ativo).map(m => `<option value="${m.numero_maquina}">Máquina ${m.numero_maquina} (${m.tipo==='baby_care'?'Baby':'Adulto'})</option>`).join('');
+    const maqAtivas = MESTRE_MAQUINAS.filter(m => m.ativo);
+    
+    if (maqAtivas.length > 0) {
+        selMq.innerHTML = maqAtivas.map(m => `<option value="${m.numero_maquina}">Máquina ${m.numero_maquina} (${m.tipo==='baby_care'?'Baby':'Adulto'})</option>`).join('');
     } else {
-        selMq.innerHTML = '<option value="">Sem máquinas</option>';
+        selMq.innerHTML = '<option value="">Sem máquinas cadastradas</option>';
     }
     
     document.getElementById('container-ordens').innerHTML = '';
