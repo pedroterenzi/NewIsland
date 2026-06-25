@@ -9,19 +9,36 @@ async function executarLogin() {
     const login = document.getElementById('login-usuario').value.trim();
     const senha = document.getElementById('login-senha').value.trim();
     if (!login || !senha) return alert("Insira suas credenciais.");
-    const btn = document.getElementById('btn-entrar'); btn.innerText = "Conectando..."; btn.disabled = true;
+    
+    const btn = document.getElementById('btn-entrar'); 
+    btn.innerText = "Acordando servidor (Pode levar 50s)..."; btn.disabled = true;
 
-    try {
-        const res = await fetch(`${API_URL}/usuarios/auth`, {
-            method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ login, senha })
-        });
-        if (res.ok) {
-            usuarioLogado = await res.json();
-            await inicializarPainel();
-        } else alert("Credenciais incorretas.");
-    } catch (e) { alert("Erro de conexão."); } 
-    finally { btn.innerText = "Entrar no Sistema"; btn.disabled = false; }
+    let tentativas = 0;
+    while(tentativas < 2) {
+        try {
+            const res = await fetch(`${API_URL}/usuarios/auth`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ login, senha })
+            });
+            if (res.ok) {
+                usuarioLogado = await res.json();
+                await inicializarPainel();
+                return;
+            } else {
+                alert("Credenciais incorretas.");
+                btn.innerText = "Entrar no Sistema"; btn.disabled = false;
+                return;
+            }
+        } catch (e) {
+            tentativas++;
+            if(tentativas >= 2) {
+                alert("Erro de conexão persistente. Tente novamente.");
+            } else {
+                await new Promise(r => setTimeout(r, 2000));
+            }
+        }
+    }
+    btn.innerText = "Entrar no Sistema"; btn.disabled = false;
 }
 
 function sair() { location.reload(); }
@@ -31,8 +48,9 @@ async function inicializarPainel() {
     document.getElementById('menu-navegacao').classList.remove('escondido');
     
     document.getElementById('txt-user').innerText = `Operador: ${usuarioLogado.nome}`;
-    if (parseInt(usuarioLogado.nivel) >= 2) document.querySelectorAll('.restrito-lider-adm').forEach(el => el.classList.remove('escondido'));
-    
+    if (parseInt(usuarioLogado.nivel) >= 2) {
+        document.querySelectorAll('.restrito-lider-adm').forEach(el => el.classList.remove('escondido'));
+    }
     const inputData = document.getElementById('ap-data');
     if (inputData) inputData.value = new Date().toISOString().split('T')[0];
 
@@ -65,12 +83,11 @@ function navegarPara(idAba) {
 
     if(idAba === 'admin') renderizarGestao();
     if(idAba === 'visao') carregarVisaoOP();
-    if(idAba === 'lancamentos') filtrarLancamentos();
+    if(idAba === 'lancamentos') filtrarLancamentos(); 
 }
 
 function abrirModal(id) {
     document.getElementById(id).classList.remove('escondido');
-    // Limpar form
     const inputs = document.getElementById(id).querySelectorAll('input');
     inputs.forEach(i => i.type !== 'hidden' ? i.value = '' : null);
 }
@@ -79,22 +96,25 @@ function fecharModal(id) { document.getElementById(id).classList.add('escondido'
 // ================= TELA APONTAMENTO =================
 function preencherSeletoresIniciais() {
     const selMq = document.getElementById('ap-maquina');
-    selMq.innerHTML = MESTRE_MAQUINAS.filter(m => m.ativo).map(m => `<option value="${m.numero_maquina}">Máquina ${m.numero_maquina} (${m.tipo==='baby_care'?'Baby':'Adulto'})</option>`).join('');
-    cancelarEdicaoApontamento();
+    if (MESTRE_MAQUINAS.length > 0) {
+        selMq.innerHTML = MESTRE_MAQUINAS.filter(m => m.ativo).map(m => `<option value="${m.numero_maquina}">Máquina ${m.numero_maquina} (${m.tipo==='baby_care'?'Baby':'Adulto'})</option>`).join('');
+    } else {
+        selMq.innerHTML = '<option value="">Sem máquinas</option>';
+    }
+    
+    document.getElementById('container-ordens').innerHTML = '';
+    document.getElementById('container-paradas').innerHTML = '';
+    contadorOrdens = 0; contadorParadas = 0;
+    
+    adicionarOrdem();
+    atualizarRegrasDeMaquina();
 }
 
 function atualizarRegrasDeMaquina() {
-    const mqNumero = document.getElementById('ap-maquina').value;
-    const mqInfo = MESTRE_MAQUINAS.find(m => String(m.numero_maquina) === String(mqNumero));
-    const tipoMaquina = mqInfo ? mqInfo.tipo : 'baby_care';
-
-    document.querySelectorAll('.select-parada-dinamica').forEach(select => {
-        const valorSalvo = select.value;
-        select.innerHTML = '<option value="">Selecione o Código</option>';
-        MESTRE_PARADAS.filter(p => p.tipo_maquina === tipoMaquina).forEach(p => {
-            select.innerHTML += `<option value="${p.numero}">${p.numero} - ${p.problema}</option>`;
-        });
-        select.value = valorSalvo;
+    document.querySelectorAll(".card-parada").forEach(div => {
+        const idCard = div.id.replace('parada-', '');
+        const inputEl = div.querySelector('.input-parada-cod');
+        if (inputEl) buscarDescricaoParada(inputEl, idCard);
     });
     calcularResumo();
 }
@@ -118,32 +138,31 @@ function adicionarOrdem() {
             <div class="grid-3">
                 <div class="form-group"><label>Counter (Peças):</label><input type="number" class="op-mc" value="0" oninput="calcularResumo()"></div>
                 <div class="form-group"><label>Pallets:</label><input type="number" class="op-pallets" value="0" oninput="calcularResumo()"></div>
-                <div class="form-group"><label>Fardos Avulsos:</label><input type="number" class="op-fardos" value="0" oninput="calcularResumo()"></div>
+                <div class="form-group"><label>Fardos Av.:</label><input type="number" class="op-fardos" value="0" oninput="calcularResumo()"></div>
             </div>
-            
             <div style="background: rgba(0,0,0,0.2); padding: 10px; border-radius: 10px; margin-top: 10px;">
                 <label style="font-size:12px; font-weight:bold; color:var(--text-muted);">TEMPOS NÃO OPERACIONAIS (TNO)</label>
                 <div id="container-tnos-ordem-${contadorOrdens}"></div>
                 <button class="btn-dash-orange" onclick="adicionarTnoOrdem(${contadorOrdens})">+ Add TNO na Ordem</button>
             </div>
-
             <div style="font-size:13px; color:var(--success-color); font-weight:bold; margin-top:10px;" id="ordem-calc-${contadorOrdens}">Estoque: 0 | Mov: 0% | Loss: 0%</div>
             <button class="btn-small-delete" onclick="removerItem('ordem-${contadorOrdens}')">Excluir Ordem</button>
         </div>`;
     container.insertAdjacentHTML('beforeend', html);
+    atualizarDescricaoSku(contadorOrdens);
 }
 
 function adicionarTnoOrdem(idOrdem) {
     contadorTnos++;
     const container = document.getElementById(`container-tnos-ordem-${idOrdem}`);
-    let tnoOpts = '<option value="">Selecione</option>' + MESTRE_TNOS.map(t => `<option value="${t.nome}">${t.nome}</option>`).join('');
+    let tnoOpts = '<option value="">Selecione o TNO</option>' + MESTRE_TNOS.map(t => `<option value="${t.nome}">${t.nome}</option>`).join('');
     const html = `
         <div class="dynamic-sub-item card-tno" id="tno-${contadorTnos}">
             <div class="grid-2">
                 <div class="form-group" style="margin-bottom:0;"><select class="tno-tipo">${tnoOpts}</select></div>
-                <div class="form-group" style="margin-bottom:0;"><input type="number" class="tno-minutos" value="0" placeholder="Minutos" oninput="calcularResumo()"></div>
+                <div class="form-group" style="margin-bottom:0;"><input type="number" class="tno-minutos" value="0" placeholder="Min" oninput="calcularResumo()"></div>
             </div>
-            <button class="btn-small-delete" style="margin-top:6px; padding: 4px 8px;" onclick="removerItem('tno-${contadorTnos}')">Excluir TNO</button>
+            <button class="btn-small-delete" style="margin-top:6px; padding: 4px 8px;" onclick="removerItem('tno-${contadorTnos}')">X Remover</button>
         </div>`;
     container.insertAdjacentHTML('beforeend', html);
 }
@@ -161,7 +180,6 @@ function adicionarParada() {
             <button class="btn-small-delete" onclick="removerItem('parada-${contadorParadas}')">Remover Parada</button>
         </div>`;
     container.insertAdjacentHTML('beforeend', html);
-    atualizarRegrasDeMaquina();
 }
 
 function buscarDescricaoParada(inputEl, idCard) {
@@ -179,6 +197,7 @@ function buscarDescricaoParada(inputEl, idCard) {
 }
 
 function removerItem(id) { document.getElementById(id).remove(); calcularResumo(); }
+
 function atualizarDescricaoSku(idCard) {
     const skuCod = document.querySelector(`#ordem-${idCard} .op-sku`).value;
     const sku = MESTRE_SKUS.find(s => s.codigo_sku === skuCod);
@@ -311,11 +330,13 @@ async function filtrarLancamentos() {
     const data = document.getElementById('filtro-data').value;
     const turno = document.getElementById('filtro-turno').value;
     const maq = document.getElementById('filtro-maq').value;
-    const op = document.getElementById('filtro-op').value;
+    const op = document.getElementById('filtro-op').value.trim();
 
-    let url = `${API_URL}/apontamentos?`;
-    if(data) url+=`data=${data}&`; if(turno) url+=`turno=${turno}&`;
-    if(maq) url+=`maquina=${maq}&`; if(op) url+=`ordem=${op}`;
+    let url = new URL(`${API_URL}/apontamentos`);
+    if(data) url.searchParams.append('data', data);
+    if(turno) url.searchParams.append('turno', turno);
+    if(maq) url.searchParams.append('maquina', maq);
+    if(op) url.searchParams.append('ordem', op);
 
     try {
         const res = await fetch(url);
@@ -326,7 +347,7 @@ async function filtrarLancamentos() {
                 <div class="item-list">
                     <div>
                         <strong style="color:var(--accent-blue);">Turno ${l.turno} - Data: ${l.data_registro.split('-').reverse().join('/')}</strong><br>
-                        <span style="font-size:12px; color:var(--text-muted);">Mák: ${l.maquina_numero} | Op: ${l.operador} | Total MC: ${l.total_mc}</span>
+                        <span style="font-size:12px; color:var(--text-muted);">Mák: ${l.maquina_numero} | Op: ${l.operador} | Total MC: ${parseFloat(l.total_mc).toLocaleString()}</span>
                     </div>
                     <div>
                         <button class="btn-small-edit" onclick="carregarParaEdicao(${l.id})">Editar</button>
@@ -409,13 +430,13 @@ async function carregarVisaoOP() {
             tbody.innerHTML = ordens.map(o => `
                 <tr>
                     <td><strong>${o.ordem}</strong></td>
-                    <td>M${o.maquina}</td>
+                    <td><span class="badge-blue">M${o.maquina}</span></td>
                     <td>${o.codigo_sku}</td>
-                    <td style="color:var(--success-color);font-weight:bold;">${parseFloat(o.pecas_estoque).toLocaleString()}</td>
+                    <td><span class="badge-success">${parseFloat(o.pecas_estoque).toLocaleString()}</span></td>
                     <td>${parseFloat(o.total_fardos_calculado).toLocaleString()}</td>
                     <td>${o.hp_total}m</td>
                     <td>${o.rt_total}m</td>
-                    <td style="color:var(--danger-color);">${o.total_mc > 0 ? (((o.total_mc - o.pecas_estoque)/o.total_mc)*100).toFixed(1) : 0}%</td>
+                    <td><span class="badge-danger">${o.total_mc > 0 ? (((o.total_mc - o.pecas_estoque)/o.total_mc)*100).toFixed(1) : 0}%</span></td>
                 </tr>
             `).join('');
         }
@@ -429,11 +450,11 @@ function renderizarGestao() {
         <div><button class="btn-small-edit" onclick="preencherEdicao('sku', ${s.id})">Editar</button><button class="btn-small-delete" onclick="deletarMestre('skus', ${s.id})">X</button></div></div>`).join('');
     
     document.getElementById('lista-admin-maquinas').innerHTML = MESTRE_MAQUINAS.map(m => `
-        <div class="item-list"><div><strong>Mák ${m.numero_maquina}</strong> - ${m.tipo} ${!m.ativo ? '(Inativa)' : ''}</div>
+        <div class="item-list"><div><strong>Mák ${m.numero_maquina}</strong> - ${m.tipo} ${!m.ativo ? '<span style="color:var(--danger-color);">(Inativa)</span>' : ''}</div>
         <div><button class="btn-small-edit" onclick="preencherEdicao('maq', ${m.id})">Editar</button></div></div>`).join('');
 
     document.getElementById('lista-admin-paradas').innerHTML = MESTRE_PARADAS.map(p => `
-        <div class="item-list"><div><strong>${p.numero}</strong> - ${p.problema}</div>
+        <div class="item-list"><div><strong>[${p.tipo_maquina === 'baby_care' ? 'Baby' : 'Adulto'}] Cód ${p.numero}</strong> - ${p.problema}</div>
         <div><button class="btn-small-edit" onclick="preencherEdicao('parada', ${p.id})">Editar</button><button class="btn-small-delete" onclick="deletarMestre('paradas', ${p.id})">X</button></div></div>`).join('');
 
     document.getElementById('lista-admin-tnos').innerHTML = MESTRE_TNOS.map(t => `
@@ -481,7 +502,7 @@ function preencherEdicao(tipo, id) {
 async function deletarMestre(rota, id) {
     if(!confirm("Tem certeza que deseja excluir?")) return;
     await fetch(`${API_URL}/admin/${rota}/${id}`, {method:'DELETE'});
-    await baixarDadosMestres(); renderizarGestao();
+    await baixarDadosMestres(); renderizarGestao(); preencherSeletoresIniciais();
 }
 
 async function salvarMestreGenerico(rota, idForm, payload, modalId) {
