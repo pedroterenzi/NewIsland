@@ -34,7 +34,7 @@ async function executarLogin() {
             if(tentativas >= 2) {
                 alert("Erro de conexão persistente. Tente novamente.");
             } else {
-                await new Promise(r => setTimeout(r, 2000));
+                await new Promise(r => setTimeout(r, 3000));
             }
         }
     }
@@ -54,6 +54,7 @@ async function inicializarPainel() {
     const inputData = document.getElementById('ap-data');
     if (inputData) inputData.value = new Date().toISOString().split('T')[0];
 
+    // O baixarDadosMestres agora traz as 5 tabelas em 1 chamada rápida!
     await baixarDadosMestres();
     preencherSeletoresIniciais();
     navegarPara('operador');
@@ -138,13 +139,15 @@ function adicionarOrdem() {
             <div class="grid-3">
                 <div class="form-group"><label>Counter (Peças):</label><input type="number" class="op-mc" value="0" oninput="calcularResumo()"></div>
                 <div class="form-group"><label>Pallets:</label><input type="number" class="op-pallets" value="0" oninput="calcularResumo()"></div>
-                <div class="form-group"><label>Fardos Av.:</label><input type="number" class="op-fardos" value="0" oninput="calcularResumo()"></div>
+                <div class="form-group"><label>Fardos Avulsos:</label><input type="number" class="op-fardos" value="0" oninput="calcularResumo()"></div>
             </div>
+            
             <div style="background: rgba(0,0,0,0.2); padding: 10px; border-radius: 10px; margin-top: 10px;">
                 <label style="font-size:12px; font-weight:bold; color:var(--text-muted);">TEMPOS NÃO OPERACIONAIS (TNO)</label>
                 <div id="container-tnos-ordem-${contadorOrdens}"></div>
                 <button class="btn-dash-orange" onclick="adicionarTnoOrdem(${contadorOrdens})">+ Add TNO na Ordem</button>
             </div>
+
             <div style="font-size:13px; color:var(--success-color); font-weight:bold; margin-top:10px;" id="ordem-calc-${contadorOrdens}">Estoque: 0 | Mov: 0% | Loss: 0%</div>
             <button class="btn-small-delete" onclick="removerItem('ordem-${contadorOrdens}')">Excluir Ordem</button>
         </div>`;
@@ -155,14 +158,14 @@ function adicionarOrdem() {
 function adicionarTnoOrdem(idOrdem) {
     contadorTnos++;
     const container = document.getElementById(`container-tnos-ordem-${idOrdem}`);
-    let tnoOpts = '<option value="">Selecione o TNO</option>' + MESTRE_TNOS.map(t => `<option value="${t.nome}">${t.nome}</option>`).join('');
+    let tnoOpts = '<option value="">Selecione</option>' + MESTRE_TNOS.map(t => `<option value="${t.nome}">${t.nome}</option>`).join('');
     const html = `
         <div class="dynamic-sub-item card-tno" id="tno-${contadorTnos}">
             <div class="grid-2">
                 <div class="form-group" style="margin-bottom:0;"><select class="tno-tipo">${tnoOpts}</select></div>
-                <div class="form-group" style="margin-bottom:0;"><input type="number" class="tno-minutos" value="0" placeholder="Min" oninput="calcularResumo()"></div>
+                <div class="form-group" style="margin-bottom:0;"><input type="number" class="tno-minutos" value="0" placeholder="Minutos" oninput="calcularResumo()"></div>
             </div>
-            <button class="btn-small-delete" style="margin-top:6px; padding: 4px 8px;" onclick="removerItem('tno-${contadorTnos}')">X Remover</button>
+            <button class="btn-small-delete" style="margin-top:6px; padding: 4px 8px;" onclick="removerItem('tno-${contadorTnos}')">Excluir TNO</button>
         </div>`;
     container.insertAdjacentHTML('beforeend', html);
 }
