@@ -23,7 +23,7 @@ def inicializar_banco():
         conn = psycopg2.connect(DATABASE_URL)
         cursor = conn.cursor()
         
-        # 1. Tabela de Usuários (Níveis 1, 2 e 3)
+        # 1. Tabela de Usuários
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS usuarios (
                 id SERIAL PRIMARY KEY,
@@ -34,7 +34,6 @@ def inicializar_banco():
             );
         """)
 
-        # Criar admin padrão se não existir
         cursor.execute("SELECT id FROM usuarios WHERE login = 'admin';")
         if not cursor.fetchone():
             cursor.execute("""
@@ -42,7 +41,7 @@ def inicializar_banco():
                 VALUES ('admin', 'admin', 'Administrador Global', 3);
             """)
 
-        # 2. Tabela Mestre de SKUs (Para conversão de pallets/fardos)
+        # 2. Tabela Mestre de SKUs
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS master_sku (
                 id SERIAL PRIMARY KEY,
@@ -52,6 +51,16 @@ def inicializar_banco():
                 pecas_por_fardo INT NOT NULL
             );
         """)
+
+        # Carga Inicial de SKUs (Só insere se a tabela estiver vazia)
+        cursor.execute("SELECT COUNT(*) FROM master_sku;")
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("""
+                INSERT INTO master_sku (codigo_sku, descricao, fardos_por_pallet, pecas_por_fardo) VALUES
+                ('SKU001', 'Fralda P Padrão', 40, 50),
+                ('SKU002', 'Fralda M Padrão', 36, 45),
+                ('SKU003', 'Fralda G Padrão', 32, 40);
+            """)
 
         # 3. Tabela de Códigos de Parada
         cursor.execute("""
@@ -63,7 +72,18 @@ def inicializar_banco():
             );
         """)
 
-        # 4. Tabela de Apontamento Geral (Cabeçalho do Turno)
+        # Carga Inicial de Paradas (Só insere se a tabela estiver vazia)
+        cursor.execute("SELECT COUNT(*) FROM codigos_parada;")
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("""
+                INSERT INTO codigos_parada (maquina, numero, problema) VALUES
+                (1, '01', 'Falta de Energia'),
+                (1, '02', 'Manutenção Preventiva'),
+                (1, '03', 'Limpeza da Máquina'),
+                (1, '04', 'Troca de Bobina');
+            """)
+
+        # 4. Tabela de Apontamento Geral
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS registro_turnos (
                 id SERIAL PRIMARY KEY,
@@ -75,7 +95,7 @@ def inicializar_banco():
             );
         """)
 
-        # 5. Tabela de Produção por Ordem (Result by order)
+        # 5. Tabela de Produção por Ordem
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS result_by_order (
                 id SERIAL PRIMARY KEY,
@@ -93,7 +113,7 @@ def inicializar_banco():
             );
         """)
 
-        # 6. Tabela de Paradas (Stop machine item)
+        # 6. Tabela de Paradas
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS stop_machine_item (
                 id SERIAL PRIMARY KEY,
@@ -115,6 +135,17 @@ inicializar_banco()
 # ==========================================
 # MODELOS DE DADOS (PYDANTIC)
 # ==========================================
+
+class ModeloSKU(BaseModel):
+    codigo_sku: str
+    descricao: str
+    fardos_por_pallet: int
+    pecas_por_fardo: int
+
+class ModeloCodigoParada(BaseModel):
+    maquina: int
+    numero: str
+    problema: str
 
 class OrdemProducao(BaseModel):
     ordem: str
@@ -139,7 +170,133 @@ class ApontamentoTurno(BaseModel):
     paradas: List[ParadaMaquina]
 
 # ==========================================
-# ROTAS E LÓGICA DE NEGÓCIO
+# ROTAS: SKUS (DADOS SKU)
+# ==========================================
+
+@app.get("/skus")
+def listar_skus():
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("SELECT * FROM master_sku ORDER BY codigo_sku ASC;")
+        dados = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return dados
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/skus")
+def criar_sku(obj: ModeloSKU):
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO master_sku (codigo_sku, descricao, fardos_por_pallet, pecas_por_fardo) VALUES (%s, %s, %s, %s) RETURNING id;",
+            (obj.codigo_sku, obj.descricao, obj.fardos_por_pallet, obj.pecas_por_fardo)
+        )
+        novo_id = cursor.fetchone()[0]
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return {"status": "sucesso", "id": novo_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/skus/{id}")
+def editar_sku(id: int, obj: ModeloSKU):
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE master_sku SET codigo_sku = %s, descricao = %s, fardos_por_pallet = %s, pecas_por_fardo = %s WHERE id = %s;",
+            (obj.codigo_sku, obj.descricao, obj.fardos_por_pallet, obj.pecas_por_fardo, id)
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return {"status": "atualizado"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/skus/{id}")
+def remover_sku(id: int):
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM master_sku WHERE id = %s;", (id,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return {"status": "removido"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==========================================
+# ROTAS: CÓDIGOS DE PARADA
+# ==========================================
+
+@app.get("/paradas-codigos")
+def listar_codigos_parada():
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("SELECT * FROM codigos_parada ORDER BY maquina ASC, numero ASC;")
+        dados = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return dados
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/paradas-codigos")
+def criar_codigo_parada(obj: ModeloCodigoParada):
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO codigos_parada (maquina, numero, problema) VALUES (%s, %s, %s) RETURNING id;",
+            (obj.maquina, obj.numero, obj.problema)
+        )
+        novo_id = cursor.fetchone()[0]
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return {"status": "sucesso", "id": novo_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/paradas-codigos/{id}")
+def editar_codigo_parada(id: int, obj: ModeloCodigoParada):
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE codigos_parada SET maquina = %s, numero = %s, problema = %s WHERE id = %s;",
+            (obj.maquina, obj.numero, obj.problema, id)
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return {"status": "atualizado"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/paradas-codigos/{id}")
+def remover_codigo_parada(id: int):
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM codigos_parada WHERE id = %s;", (id,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return {"status": "removido"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==========================================
+# ROTA: APONTAMENTO (TRAVAS DE PRODUÇÃO)
 # ==========================================
 
 @app.post("/apontamentos")
@@ -172,7 +329,6 @@ def salvar_apontamento(dados: ApontamentoTurno):
             detail=f"BLOQUEIO: Inconsistência nas paradas. (Horário Padrão [{soma_horario_padrao}m] - Run Time [{soma_run_time}m] = {tempo_parada_calculado}m). Porém, o total de paradas apontadas é {soma_paradas}m."
         )
 
-    # Se passou pelas travas, salva no banco
     try:
         conn = psycopg2.connect(DATABASE_URL)
         cursor = conn.cursor()
@@ -185,17 +341,14 @@ def salvar_apontamento(dados: ApontamentoTurno):
         
         turno_id = cursor.fetchone()[0]
 
-        # Inserir Ordens de Produção (Com cálculos de Peças e Taxas)
+        # Inserir Ordens de Produção
         for ordem in dados.ordens:
-            # Buscar dados do SKU para conversão
             cursor.execute("SELECT fardos_por_pallet, pecas_por_fardo FROM master_sku WHERE codigo_sku = %s;", (ordem.codigo_sku,))
             sku_info = cursor.fetchone()
             
-            # Se não achar o SKU, assume valores padrão para não quebrar (ideal é ter todos cadastrados)
             fardos_por_pallet = sku_info[0] if sku_info else 0
             pecas_por_fardo = sku_info[1] if sku_info else 0
 
-            # CÁLCULOS
             total_fardos = (ordem.pallets * fardos_por_pallet) + ordem.fardos_avulsos
             total_pecas = total_fardos * pecas_por_fardo
 
