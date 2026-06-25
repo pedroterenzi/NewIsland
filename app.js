@@ -11,34 +11,25 @@ async function executarLogin() {
     if (!login || !senha) return alert("Insira suas credenciais.");
     
     const btn = document.getElementById('btn-entrar'); 
-    btn.innerText = "Acordando servidor (Pode levar 50s)..."; btn.disabled = true;
+    btn.innerText = "Conectando ao banco... (pode levar 50s)"; btn.disabled = true;
 
-    let tentativas = 0;
-    while(tentativas < 2) {
-        try {
-            const res = await fetch(`${API_URL}/usuarios/auth`, {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ login, senha })
-            });
-            if (res.ok) {
-                usuarioLogado = await res.json();
-                await inicializarPainel();
-                return;
-            } else {
-                alert("Credenciais incorretas.");
-                btn.innerText = "Entrar no Sistema"; btn.disabled = false;
-                return;
-            }
-        } catch (e) {
-            tentativas++;
-            if(tentativas >= 2) {
-                alert("Erro de conexão persistente. Tente novamente.");
-            } else {
-                await new Promise(r => setTimeout(r, 3000));
-            }
+    try {
+        const res = await fetch(`${API_URL}/usuarios/auth`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ login, senha })
+        });
+        
+        if (res.ok) {
+            usuarioLogado = await res.json();
+            await inicializarPainel();
+        } else {
+            alert("Credenciais incorretas.");
         }
+    } catch (e) {
+        alert("O servidor gratuito do Render estava dormindo. Por favor, clique em Entrar no Sistema novamente!");
+    } finally {
+        btn.innerText = "Entrar no Sistema"; btn.disabled = false;
     }
-    btn.innerText = "Entrar no Sistema"; btn.disabled = false;
 }
 
 function sair() { location.reload(); }
@@ -54,7 +45,6 @@ async function inicializarPainel() {
     const inputData = document.getElementById('ap-data');
     if (inputData) inputData.value = new Date().toISOString().split('T')[0];
 
-    // O baixarDadosMestres agora traz as 5 tabelas em 1 chamada rápida!
     await baixarDadosMestres();
     preencherSeletoresIniciais();
     navegarPara('operador');
@@ -70,6 +60,8 @@ async function baixarDadosMestres() {
             MESTRE_TNOS = data.tnos || [];
             MESTRE_MAQUINAS = data.maquinas || [];
             MESTRE_USUARIOS = data.usuarios || [];
+        } else {
+            alert("Erro ao carregar o banco de dados. O painel pode ficar vazio.");
         }
     } catch (e) { console.error("Erro", e); }
 }
@@ -139,7 +131,7 @@ function adicionarOrdem() {
             <div class="grid-3">
                 <div class="form-group"><label>Counter (Peças):</label><input type="number" class="op-mc" value="0" oninput="calcularResumo()"></div>
                 <div class="form-group"><label>Pallets:</label><input type="number" class="op-pallets" value="0" oninput="calcularResumo()"></div>
-                <div class="form-group"><label>Fardos Avulsos:</label><input type="number" class="op-fardos" value="0" oninput="calcularResumo()"></div>
+                <div class="form-group"><label>Fardos Av.:</label><input type="number" class="op-fardos" value="0" oninput="calcularResumo()"></div>
             </div>
             
             <div style="background: rgba(0,0,0,0.2); padding: 10px; border-radius: 10px; margin-top: 10px;">
@@ -149,7 +141,7 @@ function adicionarOrdem() {
             </div>
 
             <div style="font-size:13px; color:var(--success-color); font-weight:bold; margin-top:10px;" id="ordem-calc-${contadorOrdens}">Estoque: 0 | Mov: 0% | Loss: 0%</div>
-            <button class="btn-small-delete" onclick="removerItem('ordem-${contadorOrdens}')">Excluir Ordem</button>
+            <button class="btn-small-delete" style="margin-top:10px;" onclick="removerItem('ordem-${contadorOrdens}')">Excluir Ordem</button>
         </div>`;
     container.insertAdjacentHTML('beforeend', html);
     atualizarDescricaoSku(contadorOrdens);
@@ -200,7 +192,6 @@ function buscarDescricaoParada(inputEl, idCard) {
 }
 
 function removerItem(id) { document.getElementById(id).remove(); calcularResumo(); }
-
 function atualizarDescricaoSku(idCard) {
     const skuCod = document.querySelector(`#ordem-${idCard} .op-sku`).value;
     const sku = MESTRE_SKUS.find(s => s.codigo_sku === skuCod);
@@ -346,7 +337,7 @@ async function filtrarLancamentos() {
         if (res.ok) {
             const data = await res.json();
             const div = document.getElementById('resultados-lancamentos');
-            div.innerHTML = data.length === 0 ? "<p>Nenhum registro encontrado.</p>" : data.map(l => `
+            div.innerHTML = data.length === 0 ? "<p style='color:var(--text-muted); margin-top:20px; text-align:center;'>Nenhum registro encontrado.</p>" : data.map(l => `
                 <div class="item-list">
                     <div>
                         <strong style="color:var(--accent-blue);">Turno ${l.turno} - Data: ${l.data_registro.split('-').reverse().join('/')}</strong><br>
@@ -400,10 +391,10 @@ async function carregarParaEdicao(id) {
                 card.querySelector('.op-pallets').value = o.pallets;
                 card.querySelector('.op-fardos').value = o.fardos_avulsos;
                 
-                const contTnos = card.querySelector(`[id^='container-tnos-']`);
                 o.tnos.forEach(t => {
                     adicionarTnoOrdem(contadorOrdens);
-                    const cardTno = card.querySelectorAll('.card-tno')[card.querySelectorAll('.card-tno').length - 1];
+                    const cardsTno = card.querySelectorAll('.card-tno');
+                    const cardTno = cardsTno[cardsTno.length - 1];
                     cardTno.querySelector('.tno-tipo').value = t.tipo_tno;
                     cardTno.querySelector('.tno-minutos').value = t.tempo_tno;
                 });
