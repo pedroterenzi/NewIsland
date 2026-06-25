@@ -134,6 +134,10 @@ inicializar_banco()
 # MODELOS DE DADOS (PYDANTIC)
 # ==========================================
 
+class ModeloAuth(BaseModel):
+    login: str
+    senha: str
+
 class ModeloSKU(BaseModel):
     codigo_sku: str
     descricao: str
@@ -172,10 +176,9 @@ class ApontamentoTurno(BaseModel):
 # ==========================================
 
 @app.post("/usuarios/auth")
-def autenticar_usuario(obj: BaseModel):
-    dados_corpo = obj.model_dump()
-    login = dados_corpo.get("login", "").strip().lower()
-    senha = dados_corpo.get("senha", "")
+def autenticar_usuario(obj: ModeloAuth):
+    login = obj.login.strip().lower()
+    senha = obj.senha
 
     usuario = None
     try:
