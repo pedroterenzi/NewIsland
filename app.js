@@ -5,6 +5,7 @@ let MESTRE_SKUS = [];
 let MESTRE_PARADAS = [];
 let MESTRE_TNOS = [];
 let MESTRE_MAQUINAS = [];
+let MESTRE_USUARIOS = [];
 
 let contadorOrdens = 0;
 let contadorParadas = 0;
@@ -31,7 +32,7 @@ async function executarLogin() {
             alert("Credenciais incorretas.");
         }
     } catch (e) {
-        alert("Erro de conexão com o servidor. Tente novamente em alguns segundos.");
+        alert("Erro de conexão com o servidor. Aguarde e tente novamente.");
     } finally {
         btn.innerText = "Entrar no Sistema"; btn.disabled = false;
     }
@@ -46,14 +47,16 @@ function sair() {
     document.getElementById('login-senha').value = '';
 }
 
+function fecharModal(id) {
+    document.getElementById(id).classList.add('escondido');
+}
+
 async function inicializarPainel() {
     document.getElementById('tela-login').classList.add('escondido');
     document.getElementById('menu-navegacao').classList.remove('escondido');
     
-    // CORREÇÃO 1: Exibe a tela do operador IMEDIATAMENTE para não ficar preta
     navegarPara('operador');
-    
-    document.getElementById('txt-user').innerText = `Colaborador: ${usuarioLogado.nome}`;
+    document.getElementById('txt-user').innerText = `Operador: ${usuarioLogado.nome}`;
 
     if (parseInt(usuarioLogado.nivel) >= 2) {
         document.querySelectorAll('.restrito-lider-adm').forEach(el => el.classList.remove('escondido'));
@@ -64,7 +67,6 @@ async function inicializarPainel() {
     const inputData = document.getElementById('ap-data');
     if (inputData) inputData.value = new Date().toISOString().split('T')[0];
 
-    // Carrega os dados em segundo plano
     await baixarDadosMestres();
     preencherSeletoresIniciais();
 }
@@ -78,10 +80,13 @@ async function baixarDadosMestres() {
             MESTRE_PARADAS = data.paradas || [];
             MESTRE_TNOS = data.tnos || [];
             MESTRE_MAQUINAS = data.maquinas || [];
-        } else {
-            console.error("Erro ao carregar dados do banco.");
         }
-    } catch (e) { console.error("Erro dados mestres", e); }
+        
+        if(parseInt(usuarioLogado.nivel) >= 2) {
+            const resU = await fetch(`${API_URL}/admin/usuarios`);
+            if (resU.ok) MESTRE_USUARIOS = await resU.json();
+        }
+    } catch (e) { console.error("Erro ao sincronizar dados", e); }
 }
 
 function preencherSeletoresIniciais() {
@@ -101,17 +106,10 @@ function preencherSeletoresIniciais() {
 }
 
 function atualizarRegrasDeMaquina() {
-    const mqNumero = document.getElementById('ap-maquina').value;
-    const mqInfo = MESTRE_MAQUINAS.find(m => String(m.numero_maquina) === String(mqNumero));
-    const tipoMaquina = mqInfo ? mqInfo.tipo : 'baby_care';
-
-    document.querySelectorAll('.select-parada-dinamica').forEach(select => {
-        const valorSalvo = select.value;
-        select.innerHTML = '<option value="">Selecione o Código</option>';
-        MESTRE_PARADAS.filter(p => p.tipo_maquina === tipoMaquina).forEach(p => {
-            select.innerHTML += `<option value="${p.numero}">${p.numero} - ${p.problema}</option>`;
-        });
-        select.value = valorSalvo;
+    document.querySelectorAll(".card-parada").forEach(div => {
+        const idCard = div.id.replace('parada-', '');
+        const inputEl = div.querySelector('.input-parada-cod');
+        if (inputEl) buscarDescricaoParada(inputEl, idCard);
     });
     calcularResumo();
 }
@@ -126,7 +124,6 @@ function adicionarOrdem() {
     let tnoOpts = '<option value="">Nenhum (0 min)</option>';
     tnoOpts += MESTRE_TNOS.map(t => `<option value="${t.nome}">${t.nome}</option>`).join('');
 
-    // CORREÇÃO 2: Adicionada a classe 'card-ordem' para evitar o erro de JavaScript
     const html = `
         <div class="dynamic-item card-ordem" id="ordem-${contadorOrdens}">
             <div class="grid-2">
@@ -157,19 +154,38 @@ function adicionarOrdem() {
     atualizarDescricaoSku(contadorOrdens);
 }
 
+// CORREÇÃO MESTRE: Input de texto com busca e confirmação dinâmica
 function adicionarParada() {
     contadorParadas++;
     const container = document.getElementById('container-paradas');
     const html = `
         <div class="dynamic-item card-parada" id="parada-${contadorParadas}">
             <div class="grid-2">
-                <div class="form-group"><label>Código do Defeito:</label><select class="input-parada-cod select-parada-dinamica"></select></div>
+                <div class="form-group">
+                    <label>Código do Defeito (Nº):</label>
+                    <input type="text" class="input-parada-cod" placeholder="Ex: 11" oninput="buscarDescricaoParada(this, ${contadorParadas})">
+                </div>
                 <div class="form-group"><label>Minutos:</label><input type="number" class="input-parada-min" value="0" oninput="calcularResumo()"></div>
             </div>
-            <button class="btn-small-delete" style="margin-top:5px;" onclick="removerItem('parada-${contadorParadas}')">Remover Parada</button>
+            <div style="font-size:12px; color: var(--accent-orange); font-weight:bold; margin-top:5px;" id="parada-desc-${contadorParadas}">Descrição: Digite o código...</div>
+            <button class="btn-small-delete" style="margin-top:10px;" onclick="removerItem('parada-${contadorParadas}')">Remover Parada</button>
         </div>`;
     container.insertAdjacentHTML('beforeend', html);
-    atualizarRegrasDeMaquina();
+}
+
+function buscarDescricaoParada(inputEl, idCard) {
+    const numero = inputEl.value.trim();
+    const mqNumero = document.getElementById('ap-maquina').value;
+    const mqInfo = MESTRE_MAQUINAS.find(m => String(m.numero_maquina) === String(mqNumero));
+    const tipoMaquina = mqInfo ? mqInfo.tipo : 'baby_care';
+
+    const parada = MESTRE_PARADAS.find(p => p.tipo_maquina === tipoMaquina && String(p.numero) === String(numero));
+    const descEl = document.getElementById(`parada-desc-${idCard}`);
+    if (descEl) {
+        descEl.innerText = parada ? `Confirmado: ${parada.problema}` : "Descrição: Código não encontrado.";
+        descEl.style.color = parada ? "var(--success-color)" : "var(--danger-color)";
+    }
+    calcularResumo();
 }
 
 function removerItem(id) { document.getElementById(id).remove(); calcularResumo(); }
@@ -188,7 +204,6 @@ function calcularResumo() {
 
     let totalMC = 0, totalPecasEstoque = 0, totalHP = 0, totalRT = 0, totalTNO = 0, totalParadas = 0;
 
-    // Busca apenas os cards REAIS de ordem, evitando o erro de Javascript
     document.querySelectorAll(".card-ordem").forEach(div => {
         const idCard = div.id.replace('ordem-', '');
         const skuCod = div.querySelector('.op-sku').value;
@@ -310,15 +325,54 @@ function navegarPara(idAba) {
     } else {
         document.getElementById('tela-admin').classList.remove('escondido');
         document.getElementById('nav-adm').classList.add('ativo');
-        carregarHistoricoAdmin();
+        renderizarListasGerenciais();
+    }
+}
+
+// RENDEREIZAÇÃO DOS CADASTROS COM MODAL DE ATUALIZAÇÃO
+function renderizarListasGerenciais() {
+    carregarHistoricoAdmin();
+
+    const boxSkus = document.getElementById('lista-skus-cadastrados');
+    if(boxSkus) {
+        boxSkus.innerHTML = MESTRE_SKUS.map(s => `
+            <div class="item-backoffice">
+                <div><strong>${s.codigo_sku}</strong> - ${s.descricao}<br><span style="font-size:11px;color:gray;">Fralda/Pct: ${s.fraldas_por_pacote} | Fardo: ${s.pacotes_por_fardo} | Pallet: ${s.fardos_por_pallet}</span></div>
+                <button class="btn-small-edit" onclick="abrirEdicaoSku(${s.id})">Editar</button>
+            </div>`).join('');
+    }
+
+    const boxMqs = document.getElementById('lista-maquinas-cadastradas');
+    if(boxMqs) {
+        boxMqs.innerHTML = MESTRE_MAQUINAS.map(m => `
+            <div class="item-backoffice">
+                <div><strong>Máquina ${m.numero_maquina}</strong> (${m.tipo === 'baby_care' ? 'Baby' : 'Adulto'})</div>
+                <span style="color:var(--accent-orange); font-size:12px; font-weight:bold;">Ativa</span>
+            </div>`).join('');
+    }
+
+    const boxP = document.getElementById('lista-paradas-cadastradas');
+    if(boxP) {
+        boxP.innerHTML = MESTRE_PARADAS.map(p => `
+            <div class="item-backoffice">
+                <div><strong>[${p.tipo_maquina === 'baby_care' ? 'Baby' : 'Adulto'}] Cód ${p.numero}</strong> - ${p.problema}</div>
+            </div>`).join('');
+    }
+
+    const boxT = document.getElementById('lista-tnos-cadastrados');
+    if(boxT) {
+        boxT.innerHTML = MESTRE_TNOS.map(t => `<div class="item-backoffice"><div>${t.nome}</div></div>`).join('');
+    }
+
+    const boxU = document.getElementById('lista-usuarios-cadastrados');
+    if(boxU) {
+        boxU.innerHTML = MESTRE_USUARIOS.map(u => `<div class="item-backoffice"><div><strong>${u.nome}</strong> (Login: ${u.login})</div></div>`).join('');
     }
 }
 
 async function carregarHistoricoAdmin() {
     const container = document.getElementById('lista-historico');
     if (!container) return;
-    container.innerHTML = "Carregando histórico...";
-
     try {
         const res = await fetch(`${API_URL}/historico-lancamentos`);
         if (res.ok) {
@@ -329,7 +383,7 @@ async function carregarHistoricoAdmin() {
                     <div class="item-backoffice">
                         <div>
                             <strong style="color:var(--accent-blue);">Data: ${l.data_registro.split('-').reverse().join('/')} | Turno ${l.turno} | Mq ${l.maquina_numero}</strong><br>
-                            <span style="font-size:12px; color:var(--text-muted);">Apontado por: ${l.operador} | Counter Total: ${parseFloat(l.total_mc).toLocaleString()}</span>
+                            <span style="font-size:12px; color:var(--text-muted);">Apontado por: ${l.operador} | Counter: ${parseFloat(l.total_mc).toLocaleString()}</span>
                         </div>
                         <button class="btn-small-delete" style="margin-top:0;" onclick="deletarHistorico(${l.id})">Apagar</button>
                     </div>`;
@@ -346,6 +400,48 @@ async function deletarHistorico(id) {
     } catch(e) { alert("Erro ao deletar."); }
 }
 
+function abrirEdicaoSku(id) {
+    const s = MESTRE_SKUS.find(item => item.id === id);
+    if(!s) return;
+    document.getElementById('edit-sku-id').value = s.id;
+    document.getElementById('edit-sku-cod').value = s.codigo_sku;
+    document.getElementById('edit-sku-desc').value = s.descricao;
+    document.getElementById('edit-sku-fraldas').value = s.fraldas_por_pacote;
+    document.getElementById('edit-sku-pacotes').value = s.pacotes_por_fardo;
+    document.getElementById('edit-sku-fardos').value = s.fardos_por_pallet;
+    document.getElementById('modal-editar-sku').classList.remove('escondido');
+}
+
+async function examinarResposta(res, sucessoMsg) {
+    if(res.ok) {
+        alert(sucessoMsg);
+        await baixarDadosMestres();
+        renderizarListasGerenciais();
+        preencherSeletoresIniciais();
+    } else {
+        const err = await res.json();
+        alert("Erro no Banco: " + err.detail);
+    }
+}
+
+async function executarEdicaoSku() {
+    const id = document.getElementById('edit-sku-id').value;
+    const codigo_sku = document.getElementById('edit-sku-cod').value.trim();
+    const descricao = document.getElementById('edit-sku-desc').value.trim();
+    const fraldas_por_pacote = parseInt(document.getElementById('edit-sku-fraldas').value) || 0;
+    const pacotes_por_fardo = parseInt(document.getElementById('edit-sku-pacotes').value) || 0;
+    const fardos_por_pallet = parseInt(document.getElementById('edit-sku-fardos').value) || 0;
+
+    try {
+        const res = await fetch(`${API_URL}/skus/${id}`, {
+            method: 'PUT', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ codigo_sku, descricao, fraldas_por_pacote, pacotes_por_fardo, fardos_por_pallet })
+        });
+        fecharModal('modal-editar-sku');
+        await examinarResposta(res, "SKU mestre atualizado com sucesso!");
+    } catch(e) { alert("Erro de conexão."); }
+}
+
 async function adicionarSkuMestre() {
     const codigo_sku = document.getElementById('adm-sku-cod').value.trim();
     const descricao = document.getElementById('adm-sku-desc').value.trim();
@@ -354,46 +450,26 @@ async function adicionarSkuMestre() {
     const fardos_por_pallet = parseInt(document.getElementById('adm-sku-fardos').value) || 0;
 
     if (!codigo_sku || !descricao) return alert("Preencha Código e Descrição do SKU.");
-
     try {
         const res = await fetch(`${API_URL}/admin/skus`, {
             method: 'POST', headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ codigo_sku, descricao, fraldas_por_pacote, pacotes_por_fardo, fardos_por_pallet })
         });
-        if(res.ok) { 
-            alert("SKU cadastrado com sucesso!"); 
-            document.getElementById('adm-sku-cod').value = '';
-            document.getElementById('adm-sku-desc').value = '';
-            document.getElementById('adm-sku-fraldas').value = '0';
-            document.getElementById('adm-sku-pacotes').value = '0';
-            document.getElementById('adm-sku-fardos').value = '0';
-            await baixarDadosMestres(); 
-            preencherSeletoresIniciais(); 
-        } else {
-            const err = await res.json(); alert("Erro: " + err.detail);
-        }
-    } catch(e) { console.error(e); alert("Erro ao conectar com o banco de dados."); }
+        await examinarResposta(res, "SKU adicionado ao banco!");
+    } catch(e) { alert("Erro de conexão."); }
 }
 
 async function adicionarMaquinaMestre() {
     const numero_maquina = parseInt(document.getElementById('adm-m-numero').value);
     const tipo = document.getElementById('adm-m-tipo').value;
     if(!numero_maquina) return alert("Insira o número.");
-
     try {
         const res = await fetch(`${API_URL}/admin/maquinas`, {
             method: 'POST', headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ numero_maquina, tipo })
         });
-        if(res.ok) { 
-            alert("Máquina salva com sucesso!"); 
-            document.getElementById('adm-m-numero').value = '';
-            await baixarDadosMestres(); 
-            preencherSeletoresIniciais(); 
-        } else {
-            const err = await res.json(); alert("Erro: " + err.detail);
-        }
-    } catch(e) { console.error(e); alert("Erro ao conectar com o banco de dados."); }
+        await examinarResposta(res, "Nova máquina salva com sucesso!");
+    } catch(e) { alert("Erro de conexão."); }
 }
 
 async function adicionarParadaMestre() {
@@ -401,42 +477,25 @@ async function adicionarParadaMestre() {
     const numero = document.getElementById('adm-p-numero').value.trim();
     const problema = document.getElementById('adm-p-problema').value.trim();
     if(!numero || !problema) return alert("Preencha Nº do Código e o Problema.");
-
     try {
         const res = await fetch(`${API_URL}/admin/paradas`, {
             method: 'POST', headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ tipo_maquina, numero, problema })
         });
-        if(res.ok) { 
-            alert("Código mestre de parada salvo!"); 
-            document.getElementById('adm-p-numero').value = '';
-            document.getElementById('adm-p-problema').value = '';
-            await baixarDadosMestres(); 
-            atualizarRegrasDeMaquina(); 
-        } else {
-            const err = await res.json(); alert("Erro: " + err.detail);
-        }
-    } catch(e) { console.error(e); alert("Erro ao conectar com o banco de dados."); }
+        await examinarResposta(res, "Código mestre de parada salvo!");
+    } catch(e) { alert("Erro de conexão."); }
 }
 
 async function adicionarTnoMestre() {
     const nome = document.getElementById('adm-tno-nome').value.trim();
     if(!nome) return alert("Digite o nome da classificação.");
-
     try {
         const res = await fetch(`${API_URL}/admin/tnos`, {
             method: 'POST', headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ nome })
         });
-        if(res.ok) { 
-            alert("Nova estratificação de TNO cadastrada!"); 
-            document.getElementById('adm-tno-nome').value = '';
-            await baixarDadosMestres(); 
-            preencherSeletoresIniciais(); 
-        } else {
-            const err = await res.json(); alert("Erro: " + err.detail);
-        }
-    } catch(e) { console.error(e); alert("Erro ao conectar com o banco de dados."); }
+        await examinarResposta(res, "Nova classificação de TNO cadastrada!");
+    } catch(e) { alert("Erro de conexão."); }
 }
 
 async function adicionarUsuarioMestre() {
@@ -445,19 +504,11 @@ async function adicionarUsuarioMestre() {
     const senha = document.getElementById('adm-u-senha').value;
     const nivel = parseInt(document.getElementById('adm-u-nivel').value);
     if(!nome || !login || !senha) return alert("Preencha todos os campos do usuário.");
-
     try {
         const res = await fetch(`${API_URL}/admin/usuarios`, {
             method: 'POST', headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ login, senha, nome, nivel })
         });
-        if(res.ok) {
-            alert("Novo colaborador adicionado ao banco de dados!");
-            document.getElementById('adm-u-nome').value = '';
-            document.getElementById('adm-u-login').value = '';
-            document.getElementById('adm-u-senha').value = '';
-        } else {
-            const err = await res.json(); alert("Erro: " + err.detail);
-        }
-    } catch(e) { console.error(e); alert("Erro ao conectar com o banco de dados."); }
+        await examinarResposta(res, "Novo colaborador adicionado ao banco de dados!");
+    } catch(e) { alert("Erro de conexão."); }
 }
