@@ -10,19 +10,27 @@ let contadorOrdens = 0;
 let contadorParadas = 0;
 
 // ==========================================
-// FUNÇÃO PARA LIDAR COM O "SONO" DO RENDER
+// FUNÇÃO INTELIGENTE PARA LIDAR COM O RENDER
 // ==========================================
 async function fetchComTentativas(url, options = {}, retries = 4) {
     for (let i = 0; i < retries; i++) {
         try {
-            const response = await fetch(url, options);
-            // Se conectou, retorna a resposta
+            // Cria um controlador para forçar o cancelamento se demorar mais de 10 segundos
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
+            
+            const fetchOptions = { ...options, signal: controller.signal };
+            const response = await fetch(url, fetchOptions);
+            
+            clearTimeout(timeoutId); // Limpa o timeout se respondeu a tempo
             return response; 
         } catch (err) {
-            if (i === retries - 1) throw err; // Se for a última tentativa, lança o erro
-            console.log(`Tentativa ${i+1} falhou, aguardando servidor despertar...`);
-            // Espera 3 segundos antes de tentar de novo
-            await new Promise(res => setTimeout(res, 3000));
+            console.warn(`Tentativa ${i+1} falhou:`, err.message);
+            if (i === retries - 1) {
+                throw new Error("O servidor demorou muito para responder. Verifique sua conexão ou tente novamente mais tarde.");
+            }
+            // Espera 4 segundos antes da próxima tentativa
+            await new Promise(res => setTimeout(res, 4000));
         }
     }
 }
@@ -40,7 +48,7 @@ async function executarLogin() {
 
     if (!loginInput || !senhaInput) return alert("Preencha usuário e senha.");
 
-    btn.innerText = "Conectando (Pode levar até 1 minuto)..."; 
+    btn.innerText = "Conectando (Pode levar 1 min)..."; 
     btn.disabled = true;
 
     try {
@@ -50,7 +58,7 @@ async function executarLogin() {
             body: JSON.stringify({ login: loginInput, senha: senhaInput })
         });
 
-        if (res.ok) {
+        if (res && res.ok) {
             const user = await res.json();
             usuarioLogado = user;
             iniciarAppOperador();
@@ -58,7 +66,7 @@ async function executarLogin() {
             alert("Usuário ou senha incorretos.");
         }
     } catch (e) {
-        alert("O servidor gratuito pode estar despertando. Aguarde alguns segundos e clique novamente!");
+        alert(e.message || "O servidor gratuito pode estar despertando. Aguarde alguns segundos e clique novamente!");
     } finally {
         btn.innerText = "Entrar"; 
         btn.disabled = false;
@@ -83,7 +91,6 @@ async function iniciarAppOperador() {
 
 async function carregarDadosMestres() {
     try {
-        // Agora usamos a função que faz retentativas caso o backend esteja lento
         const resSkus = await fetchComTentativas(`${API_URL}/skus`);
         if (resSkus && resSkus.ok) DADOS_SKUS = await resSkus.json();
 
@@ -91,13 +98,11 @@ async function carregarDadosMestres() {
         if (resParadas && resParadas.ok) DADOS_CODIGOS_PARADA = await resParadas.json();
     } catch (e) {
         console.error("Erro ao baixar SKUs e Códigos", e);
-        alert("Atenção: Os dados de produtos e paradas não carregaram corretamente. Recarregue a página.");
+        alert("Atenção: Servidor demorou para carregar os SKUs e Paradas. Recarregue a página em alguns instantes.");
     }
 }
 
 function carregarSkusEParadasDaMaquina() {
-    // Se o operador mudar a máquina, seria ideal recarregar os selects de paradas,
-    // pois algumas paradas podem ser específicas de cada máquina.
     const selectsParada = document.querySelectorAll('.select-codigo-parada');
     const maquinaSelecionada = document.getElementById('ap-maquina').value;
 
@@ -107,7 +112,7 @@ function carregarSkusEParadasDaMaquina() {
         DADOS_CODIGOS_PARADA.filter(p => String(p.maquina) === String(maquinaSelecionada)).forEach(p => {
             select.innerHTML += `<option value="${p.numero}">${p.numero} - ${p.problema}</option>`;
         });
-        select.value = valorAtual; // Tenta manter o valor anterior
+        select.value = valorAtual; 
     });
 }
 
@@ -119,7 +124,6 @@ function adicionarOrdem() {
     contadorOrdens++;
     const container = document.getElementById('container-ordens');
     
-    // Gera as options do select de SKUs
     let skuOptions = '<option value="">Selecione o Produto (SKU)</option>';
     DADOS_SKUS.forEach(sku => {
         skuOptions += `<option value="${sku.codigo_sku}">${sku.codigo_sku} - ${sku.descricao}</option>`;
@@ -211,25 +215,20 @@ function calcularResumo() {
     const cargaTurnos = { 1: 455, 2: 440, 3: 415 };
     const cargaExigida = cargaTurnos[turno];
 
-    // Somar Ordens
     let somaHP = 0;
     let somaRT = 0;
     document.querySelectorAll('.input-hp').forEach(el => somaHP += parseInt(el.value || 0));
     document.querySelectorAll('.input-rt').forEach(el => somaRT += parseInt(el.value || 0));
 
-    // Somar Paradas
     let somaParadas = 0;
     document.querySelectorAll('.input-minutos-parada').forEach(el => somaParadas += parseInt(el.value || 0));
 
-    // TRAVA 1: HP + TNO == Carga Turno
     const tempoTotalApontado = somaHP + tno;
     const trava1Ok = tempoTotalApontado === cargaExigida;
 
-    // TRAVA 2: HP - RT == Paradas
     const paradasEsperadas = somaHP - somaRT;
     const trava2Ok = paradasEsperadas === somaParadas && paradasEsperadas >= 0;
 
-    // Atualizar UI
     document.getElementById('res-carga').innerText = `${cargaExigida}m`;
     
     const elResTotal = document.getElementById('res-total');
@@ -242,7 +241,6 @@ function calcularResumo() {
     elResParada.innerText = `${somaParadas}m`;
     elResParada.className = trava2Ok ? 'status-ok' : 'status-erro';
 
-    // Habilitar botão apenas se as duas travas passarem
     document.getElementById('btn-enviar-apontamento').disabled = !(trava1Ok && trava2Ok);
 }
 
@@ -266,7 +264,6 @@ async function enviarApontamento() {
             paradas: []
         };
 
-        // Coletar Ordens
         document.querySelectorAll("[id^='ordem-']").forEach(div => {
             payload.ordens.push({
                 ordem: div.querySelector('.input-ordem').value,
@@ -279,7 +276,6 @@ async function enviarApontamento() {
             });
         });
 
-        // Coletar Paradas
         document.querySelectorAll("[id^='parada-']").forEach(div => {
             payload.paradas.push({
                 numero_parada: div.querySelector('.input-codigo-parada').value,
@@ -287,7 +283,6 @@ async function enviarApontamento() {
             });
         });
 
-        // Verificação final preventiva frontend
         if (payload.ordens.length === 0) {
             throw new Error("Adicione pelo menos uma ordem de produção.");
         }
@@ -298,15 +293,14 @@ async function enviarApontamento() {
             if(!p.numero_parada) throw new Error("Selecione o código de problema para as paradas.");
         }
 
-        const res = await fetch(`${API_URL}/apontamentos`, {
+        const res = await fetchComTentativas(`${API_URL}/apontamentos`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(payload)
         });
 
-        if (res.ok) {
+        if (res && res.ok) {
             alert("✅ Apontamento de turno gravado no Banco de Dados com Sucesso!");
-            // Limpa a tela para o próximo
             document.getElementById('container-ordens').innerHTML = '';
             document.getElementById('container-paradas').innerHTML = '';
             document.getElementById('ap-tno').value = 0;
@@ -321,6 +315,6 @@ async function enviarApontamento() {
         alert(e.message || "Erro ao conectar com a API.");
     } finally {
         btn.innerText = "Enviar Apontamento";
-        calcularResumo(); // Força a revalidação para destravar/trancar o botão
+        calcularResumo(); 
     }
 }
