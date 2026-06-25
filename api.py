@@ -173,7 +173,6 @@ class ApontamentoTurno(BaseModel):
 
 @app.post("/usuarios/auth")
 def autenticar_usuario(obj: BaseModel):
-    # Modelo dinâmico simples para evitar conflitos de campos antigos
     dados_corpo = obj.model_dump()
     login = dados_corpo.get("login", "").strip().lower()
     senha = dados_corpo.get("senha", "")
@@ -189,10 +188,9 @@ def autenticar_usuario(obj: BaseModel):
     except Exception:
         pass
         
-    # BACKUP À PROVA DE FALHAS: Se for o admin mestre e o banco falhar ou estiver vazio, força a entrada
+    # BACKUP À PROVA DE FALHAS
     if not usuario and login == "admin" and senha == "admin":
         try:
-            # Tenta criar a tabela e o usuário na marra em tempo de execução
             conn = psycopg2.connect(DATABASE_URL)
             cursor = conn.cursor()
             cursor.execute("""
@@ -210,13 +208,16 @@ def autenticar_usuario(obj: BaseModel):
         except Exception:
             pass
         
-        # Retorna a sessão mockada diretamente para não travar o desenvolvedor
         return {"login": "admin", "senha": "admin", "nome": "Administrador Global", "nivel": 3}
         
     if usuario:
         return usuario
         
     raise HTTPException(status_code=404, detail="Usuário ou senha incorretos.")
+
+# ==========================================
+# ROTAS: SKUS (DADOS SKU)
+# ==========================================
 
 @app.get("/skus")
 def listar_skus():
@@ -300,7 +301,7 @@ def criar_codigo_parada(obj: ModeloCodigoParada):
         conn = psycopg2.connect(DATABASE_URL)
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT INTO codigos_parada (maquina, numero, समस्या) VALUES (%s, %s, %s) RETURNING id;",
+            "INSERT INTO codigos_parada (maquina, numero, problema) VALUES (%s, %s, %s) RETURNING id;",
             (obj.maquina, obj.numero, obj.problema)
         )
         novo_id = cursor.fetchone()[0]
@@ -370,7 +371,7 @@ def salvar_apontamento(dados: ApontamentoTurno):
             detail=f"BLOQUEIO: Inconsistência nas paradas. (Horário Padrão [{soma_horario_padrao}m] - Run Time [{soma_run_time}m] = {tempo_parada_calculado}m). Porém, o total de paradas apontadas é {soma_paradas}m."
         )
 
-    try {
+    try:
         conn = psycopg2.connect(DATABASE_URL)
         cursor = conn.cursor()
 
