@@ -4,13 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Unicharm - Controle de Produção</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg-color: #0b1329;
             --card-bg: #131a35;
-            --card-hover: #1c2541;
             --accent-blue: #3b82f6; 
+            --accent-blue-hover: #1d4ed8;
             --accent-orange: #f97316; 
             --accent-orange-hover: #ea580c;
             --text-color: #f8fafc;
@@ -19,15 +21,17 @@
             --success-color: #10b981;
             --danger-color: #ef4444;
         }
+
         * { box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; }
         body { background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 0; display: flex; justify-content: center; padding-bottom: 120px; letter-spacing: -0.3px; overflow-x: hidden; }
         .app-container { width: 100%; max-width: 600px; padding: 16px; margin: 0 auto; overflow-x: hidden; }
+        
         .card { background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%); border: 1px solid var(--border-color); padding: 24px; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 8px 30px rgba(0,0,0,0.5); width: 100%; }
         
         .form-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; width: 100%; }
         .form-group label { font-size: 13px; font-weight: 600; color: var(--text-muted); }
         .form-group input, .form-group select { 
-            width: 100%; height: 48px; padding: 0 14px; background: #0f172a; border: 1px solid #334155; border-radius: 12px; color: white; font-size: 14px; transition: all 0.3s ease; -webkit-appearance: none; appearance: none; box-sizing: border-box;
+            width: 100%; height: 48px; padding: 0 14px; background: #0f172a; border: 1px solid #334155; border-radius: 12px; color: white; font-size: 14px; transition: all 0.3s ease; -webkit-appearance: none; appearance: none;
         }
         .form-group select { background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 12px center; background-size: 16px; padding-right: 32px; }
         .form-group input:focus, .form-group select:focus { border-color: var(--accent-blue); outline: none; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
@@ -47,10 +51,9 @@
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
         
-        .grid-indicadores { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px; }
-        .kpi-card { background: #0f172a; border: 1px solid #334155; padding: 20px; border-radius: 16px; display: flex; flex-direction: column; align-items: center; text-align: center;}
-        .kpi-card .kpi-label { font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;}
-        .kpi-card .kpi-val { font-size: 22px; font-weight: 800; margin-top: 8px; letter-spacing: -0.5px; }
+        .kpi-card { background: #0f172a; border: 1px solid #334155; padding: 16px; border-radius: 16px; text-align: center;}
+        .kpi-card .kpi-label { font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;}
+        .kpi-card .kpi-val { font-size: 20px; font-weight: 800; margin-top: 6px; letter-spacing: -0.5px; }
         
         .resumo-box { background: rgba(37, 99, 235, 0.05); border: 1px solid rgba(37, 99, 235, 0.2); padding: 16px; border-radius: 14px; margin-bottom: 20px; }
         .resumo-item { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 6px; }
@@ -69,9 +72,16 @@
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(5px); display: flex; justify-content: center; align-items: center; z-index: 2000; padding: 20px; }
         .modal-content { background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%); border: 1px solid #334155; border-radius: 20px; padding: 28px; width: 100%; max-width: 420px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 40px rgba(0,0,0,0.6);}
         
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px;}
-        th, td { border: 1px solid var(--border-color); padding: 10px; text-align: left; }
-        th { background: #0f172a; color: var(--accent-orange); }
+        /* Tabela Premium Estilo Totvs/BI */
+        .table-wrapper { width: 100%; overflow-x: auto; border-radius: 12px; border: 1px solid var(--border-color); background: #0f172a; }
+        .table-premium { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; white-space: nowrap; }
+        .table-premium th { background: rgba(37, 99, 235, 0.1); color: var(--accent-blue); padding: 16px; font-weight: 700; border-bottom: 2px solid var(--border-color); text-transform: uppercase; letter-spacing: 0.5px; }
+        .table-premium td { padding: 16px; border-bottom: 1px solid rgba(51, 65, 85, 0.5); color: var(--text-color); }
+        .table-premium tr:hover td { background: rgba(255, 255, 255, 0.02); }
+        .table-premium tr:last-child td { border-bottom: none; }
+        .badge-success { background: rgba(16, 185, 129, 0.1); color: var(--success-color); padding: 4px 8px; border-radius: 6px; font-weight: 700; }
+        .badge-danger { background: rgba(239, 68, 68, 0.1); color: var(--danger-color); padding: 4px 8px; border-radius: 6px; font-weight: 700; }
+        .badge-blue { background: rgba(37, 99, 235, 0.1); color: var(--accent-blue); padding: 4px 8px; border-radius: 6px; font-weight: 700; }
     </style>
 </head>
 <body>
@@ -115,7 +125,7 @@
 
         <div class="card">
             <h3>4. Validação & Resumo do Turno</h3>
-            <div class="grid-indicadores">
+            <div class="grid-2">
                 <div class="kpi-card"><div class="kpi-label">Counter Turno</div><div class="kpi-val" id="card-mc">0</div></div>
                 <div class="kpi-card"><div class="kpi-label">Peças Estoque</div><div class="kpi-val" id="card-pecas" style="color: var(--success-color);">0</div></div>
                 <div class="kpi-card"><div class="kpi-label">Movimentação</div><div class="kpi-val" id="card-mov">0%</div></div>
@@ -124,7 +134,7 @@
                 <div class="kpi-card"><div class="kpi-label">Total Paradas</div><div class="kpi-val" id="card-paradas">0m</div></div>
             </div>
 
-            <div class="resumo-box">
+            <div class="resumo-box" style="margin-top: 15px;">
                 <div class="resumo-item"><span>Carga Padrão Turno:</span> <span id="res-carga">455m</span></div>
                 <div class="resumo-item"><span>HP Total + TNO Lançado:</span> <span id="res-total" class="status-erro">0m</span></div>
                 <div style="border-top: 1px dashed var(--border-color); margin: 8px 0;"></div>
@@ -139,28 +149,29 @@
     <div id="tela-lancamentos" class="escondido aba-conteudo">
         <h2 style="text-align: left; margin-bottom: 20px; color: var(--accent-blue);">Lançamentos</h2>
         <div class="card">
-            <h3>Filtrar Apontamentos</h3>
+            <h3 style="color: var(--accent-orange);">Filtros de Busca</h3>
             <div class="grid-2">
-                <div class="form-group"><label>Data:</label><input type="date" id="filtro-data"></div>
-                <div class="form-group"><label>Turno:</label><select id="filtro-turno"><option value="">Todos</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></div>
+                <div class="form-group"><label>Data:</label><input type="date" id="filtro-data" onchange="filtrarLancamentos()"></div>
+                <div class="form-group"><label>Turno:</label><select id="filtro-turno" onchange="filtrarLancamentos()"><option value="">Todos</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></div>
             </div>
             <div class="grid-2">
-                <div class="form-group"><label>Máquina:</label><input type="number" id="filtro-maq" placeholder="Nº Máquina"></div>
-                <div class="form-group"><label>OP:</label><input type="text" id="filtro-op" placeholder="Nº Ordem"></div>
+                <div class="form-group"><label>Máquina:</label><input type="number" id="filtro-maq" placeholder="Nº Máquina" oninput="filtrarLancamentos()"></div>
+                <div class="form-group"><label>OP:</label><input type="text" id="filtro-op" placeholder="Nº Ordem" oninput="filtrarLancamentos()"></div>
             </div>
-            <button class="btn-blue" onclick="filtrarLancamentos()">Buscar Lançamentos</button>
         </div>
         <div id="resultados-lancamentos"></div>
     </div>
 
     <div id="tela-visao" class="escondido aba-conteudo">
         <h2 style="text-align: left; margin-bottom: 20px; color: var(--accent-blue);">Visão por OP (TOTVS)</h2>
-        <div class="card" style="overflow-x: auto;">
-            <p style="font-size: 13px; color: var(--text-muted); margin-top:0;">Acumulado de todos os turnos para validação sistêmica.</p>
-            <table id="tabela-visao-op">
-                <thead><tr><th>OP</th><th>Máquina</th><th>SKU</th><th>Peças Estoque</th><th>Fardos Totais</th><th>HP</th><th>RT</th><th>Loss</th></tr></thead>
-                <tbody></tbody>
-            </table>
+        <div class="card">
+            <p style="font-size: 13px; color: var(--text-muted); margin-top:0;">Acumulado de turnos para validação sistêmica.</p>
+            <div class="table-wrapper">
+                <table class="table-premium" id="tabela-visao-op">
+                    <thead><tr><th>OP</th><th>Mák</th><th>SKU</th><th>Peças Estoque</th><th>Fardos</th><th>HP (m)</th><th>RT (m)</th><th>Loss</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
         </div>
     </div>
 
@@ -168,7 +179,7 @@
         <h2 style="text-align: left; margin-bottom: 20px; color: var(--accent-blue);">Gestão de Cadastros</h2>
         
         <div class="card">
-            <h3>Máquinas Ativas</h3>
+            <h3>Máquinas da Planta</h3>
             <button class="btn-dash" onclick="abrirModal('modal-maq')">+ Adicionar Máquina</button>
             <div id="lista-admin-maquinas"></div>
         </div>
@@ -218,7 +229,8 @@
             <div class="form-group"><label>Pct/Fardo:</label><input type="number" id="form-sku-pac"></div>
             <div class="form-group"><label>Fardos/Pallet:</label><input type="number" id="form-sku-far"></div>
         </div>
-        <button class="btn-blue" onclick="salvarSku()">Salvar</button><button class="btn-dash" onclick="fecharModal('modal-sku')" style="margin-top:10px; border-color:var(--text-muted); color:var(--text-muted);">Cancelar</button>
+        <button class="btn-blue" onclick="salvarSku()">Salvar</button>
+        <button class="btn-dash" style="margin-top:10px; border-color:var(--text-muted); color:var(--text-muted);" onclick="fecharModal('modal-sku')">Cancelar</button>
     </div>
 </div>
 
@@ -229,7 +241,8 @@
         <div class="form-group"><label>Número:</label><input type="number" id="form-maq-num"></div>
         <div class="form-group"><label>Segmento:</label><select id="form-maq-tipo"><option value="baby_care">Baby Care</option><option value="adult_care">Adulto Geriátrico</option></select></div>
         <div class="form-group"><label>Status:</label><select id="form-maq-ativo"><option value="true">Ativa</option><option value="false">Desativada</option></select></div>
-        <button class="btn-blue" onclick="salvarMaquina()">Salvar</button><button class="btn-dash" onclick="fecharModal('modal-maq')" style="margin-top:10px; border-color:gray; color:gray;">Cancelar</button>
+        <button class="btn-blue" onclick="salvarMaquina()">Salvar</button>
+        <button class="btn-dash" style="margin-top:10px; border-color:var(--text-muted); color:var(--text-muted);" onclick="fecharModal('modal-maq')">Cancelar</button>
     </div>
 </div>
 
@@ -240,7 +253,8 @@
         <div class="form-group"><label>Segmento:</label><select id="form-parada-tipo"><option value="baby_care">Baby Care</option><option value="adult_care">Adulto Care</option></select></div>
         <div class="form-group"><label>Nº Código:</label><input type="text" id="form-parada-num"></div>
         <div class="form-group"><label>Problema:</label><input type="text" id="form-parada-prob"></div>
-        <button class="btn-blue" onclick="salvarParada()">Salvar</button><button class="btn-dash" onclick="fecharModal('modal-parada')" style="margin-top:10px; border-color:gray; color:gray;">Cancelar</button>
+        <button class="btn-blue" onclick="salvarParada()">Salvar</button>
+        <button class="btn-dash" style="margin-top:10px; border-color:var(--text-muted); color:var(--text-muted);" onclick="fecharModal('modal-parada')">Cancelar</button>
     </div>
 </div>
 
@@ -249,7 +263,8 @@
         <h3 id="modal-tno-titulo">Classificação TNO</h3>
         <input type="hidden" id="form-tno-id">
         <div class="form-group"><label>Nome:</label><input type="text" id="form-tno-nome"></div>
-        <button class="btn-blue" onclick="salvarTno()">Salvar</button><button class="btn-dash" onclick="fecharModal('modal-tno')" style="margin-top:10px; border-color:gray; color:gray;">Cancelar</button>
+        <button class="btn-blue" onclick="salvarTno()">Salvar</button>
+        <button class="btn-dash" style="margin-top:10px; border-color:var(--text-muted); color:var(--text-muted);" onclick="fecharModal('modal-tno')">Cancelar</button>
     </div>
 </div>
 
@@ -259,9 +274,10 @@
         <input type="hidden" id="form-u-id">
         <div class="form-group"><label>Nome:</label><input type="text" id="form-u-nome"></div>
         <div class="form-group"><label>Login:</label><input type="text" id="form-u-login"></div>
-        <div class="form-group"><label>Senha:</label><input type="password" id="form-u-senha"></div>
+        <div class="form-group"><label>Senha (Atualize p/ salvar):</label><input type="password" id="form-u-senha"></div>
         <div class="form-group"><label>Acesso:</label><select id="form-u-nivel"><option value="1">Operador</option><option value="2">Liderança</option><option value="3">Admin</option></select></div>
-        <button class="btn-blue" onclick="salvarUsuario()">Salvar</button><button class="btn-dash" onclick="fecharModal('modal-usuario')" style="margin-top:10px; border-color:gray; color:gray;">Cancelar</button>
+        <button class="btn-blue" onclick="salvarUsuario()">Salvar</button>
+        <button class="btn-dash" style="margin-top:10px; border-color:var(--text-muted); color:var(--text-muted);" onclick="fecharModal('modal-usuario')">Cancelar</button>
     </div>
 </div>
 
