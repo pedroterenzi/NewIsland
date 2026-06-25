@@ -6,13 +6,12 @@
     <title>Unicharm - Controle de Produção</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2 family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg-color: #09090b;
             --card-bg: #131418;
-            --accent-color: #3b82f6; /* Mudei para azul industrial, mais padrão fábrica */
-            --accent-hover: #2563eb;
+            --accent-color: #2563eb;
             --text-color: #f4f4f5;
             --text-muted: #a1a1aa;
             --border-color: #27272a;
@@ -20,101 +19,68 @@
             --danger-color: #ef4444;
             --warning-color: #f59e0b;
         }
-
         * { box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
-        body { background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 0; padding-bottom: 100px; overflow-x: hidden; }
-        .app-container { width: 100%; max-width: 600px; padding: 16px; margin: 0 auto; }
-        
-        .card { background: linear-gradient(145deg, #16171a 0%, #111215 100%); border: 1px solid var(--border-color); padding: 20px; border-radius: 16px; margin-bottom: 20px; }
-        
+        body { background-color: var(--bg-color); color: var(--text-color); margin: 0; padding-bottom: 120px; }
+        .app-container { width: 100%; max-width: 700px; padding: 16px; margin: 0 auto; }
+        .card { background: #131418; border: 1px solid var(--border-color); padding: 20px; border-radius: 16px; margin-bottom: 20px; }
         .form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; width: 100%; }
         .form-group label { font-size: 13px; font-weight: 600; color: var(--text-muted); }
         .form-group input, .form-group select { 
-            width: 100%; height: 44px; padding: 0 12px; background: #18191c; 
+            width: 100%; height: 42px; padding: 0 12px; background: #18191c; 
             border: 1px solid #33353b; border-radius: 10px; color: white; font-size: 14px; 
         }
         .form-group input:focus, .form-group select:focus { border-color: var(--accent-color); outline: none; }
-        
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
-
-        h2, h3, h4 { color: #ffffff; margin-top: 0; }
-        h2 { font-size: 22px; text-align: center; }
-        h3 { font-size: 16px; margin-bottom: 16px; color: var(--accent-color); border-bottom: 1px solid var(--border-color); padding-bottom: 8px;}
-        
-        .btn-primary { width: 100%; background: var(--accent-color); color: #fff; border: none; padding: 14px; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; transition: 0.2s; }
-        .btn-primary:hover { background: var(--accent-hover); }
-        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-        
-        .btn-secondary { width: 100%; background: transparent; color: var(--accent-color); border: 1px dashed var(--accent-color); padding: 12px; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; margin-bottom: 16px;}
-        .btn-danger-small { background: rgba(239, 68, 68, 0.1); color: var(--danger-color); border: 1px solid rgba(239, 68, 68, 0.3); padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; margin-top: 8px;}
-
-        .dynamic-item { background: #1a1c23; border: 1px solid #2a2c32; padding: 12px; border-radius: 12px; margin-bottom: 12px; position: relative; }
-        
-        .escondido { display: none !important; }
-        
-        .resumo-box { background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.2); padding: 16px; border-radius: 12px; margin-bottom: 16px; }
-        .resumo-item { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 14px; }
+        .grid-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 15px; }
+        .mini-card { background: #18191c; border: 1px solid var(--border-color); padding: 12px; border-radius: 10px; text-align: center; }
+        .mini-card div { font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
+        .mini-card strong { font-size: 16px; display: block; margin-top: 4px; }
+        h2, h3 { color: #fff; text-align: center; }
+        h3 { text-align: left; color: var(--accent-color); border-bottom: 1px solid var(--border-color); padding-bottom: 6px; }
+        .btn { width: 100%; padding: 12px; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; border: none; transition: 0.2s; }
+        .btn-blue { background: var(--accent-color); color: white; }
+        .btn-dash { background: transparent; color: var(--accent-color); border: 1px dashed var(--accent-color); margin-bottom: 12px; }
+        .btn-danger { background: rgba(239, 68, 68, 0.15); color: var(--danger-color); border: 1px solid var(--danger-color); padding: 6px; font-size: 12px; }
+        .dynamic-item { background: #18191c; border: 1px solid var(--border-color); padding: 14px; border-radius: 12px; margin-bottom: 14px; }
+        .resumo-box { background: rgba(37, 99, 235, 0.05); border: 1px solid rgba(37, 99, 235, 0.2); padding: 14px; border-radius: 10px; margin-bottom: 15px; }
+        .resumo-item { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
         .status-ok { color: var(--success-color); font-weight: bold; }
         .status-erro { color: var(--danger-color); font-weight: bold; }
+        .nav-inferior { position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 500px; background: #131418; border: 1px solid var(--border-color); display: flex; justify-content: space-around; padding: 10px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .nav-item { background: none; border: none; color: var(--text-muted); font-weight: 700; cursor: pointer; padding: 8px 12px; border-radius: 10px; }
+        .nav-item.ativo { color: var(--accent-color); background: rgba(37, 99, 235, 0.1); }
+        .escondido { display: none !important; }
     </style>
 </head>
 <body>
 
 <div class="app-container">
 
-    <div id="tela-login" class="card" style="margin-top: 10vh;">
+    <div id="tela-login" class="card" style="margin-top: 15vh;">
         <h2>Unicharm Production</h2>
-        <p style="text-align:center; color:var(--text-muted); font-size: 13px; margin-top:-10px; margin-bottom: 25px;">Sistema de Apontamento Digital</p>
-
-        <div class="form-group">
-            <label>Usuário:</label>
-            <input type="text" id="login-usuario" placeholder="Digite seu usuário">
-        </div>
-        <div class="form-group">
-            <label>Senha:</label>
-            <input type="password" id="login-senha" placeholder="•••••">
-        </div>
-        <button class="btn-primary" id="btn-entrar" onclick="executarLogin()">Entrar</button>
+        <div class="form-group"><label>Usuário:</label><input type="text" id="login-usuario"></div>
+        <div class="form-group"><label>Senha:</label><input type="password" id="login-senha"></div>
+        <button class="btn btn-blue" onclick="executarLogin()">Entrar</button>
     </div>
 
     <div id="tela-operador" class="escondido">
-        <div style="text-align: center; margin-bottom: 20px;">
-            <h2 id="boas-vindas">Apontamento de Turno</h2>
-            <button onclick="sair()" style="background:none; border:none; color:var(--danger-color); cursor:pointer; font-weight:bold;">Sair da Conta</button>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h4 id="txt-user" style="margin:0; color: var(--text-muted);">Operador: ...</h4>
+            <button onclick="sair()" style="background: none; border: none; color: var(--danger-color); font-weight: bold; cursor: pointer;">Sair</button>
         </div>
 
         <div class="card">
-            <h3>1. Dados do Turno</h3>
-            <div class="grid-2">
-                <div class="form-group">
-                    <label>Data:</label>
-                    <input type="date" id="ap-data">
-                </div>
+            <h3>1. Identificação do Turno</h3>
+            <div class="grid-3">
+                <div class="form-group"><label>Data:</label><input type="date" id="ap-data"></div>
                 <div class="form-group">
                     <label>Turno:</label>
-                    <select id="ap-turno" onchange="calcularResumo()">
-                        <option value="1">Turno 1 (455m)</option>
-                        <option value="2">Turno 2 (440m)</option>
-                        <option value="3">Turno 3 (415m)</option>
-                    </select>
+                    <select id="ap-turno" onchange="calcularResumo()"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
                 </div>
-            </div>
-            <div class="grid-2">
                 <div class="form-group">
                     <label>Máquina:</label>
-                    <select id="ap-maquina" onchange="carregarSkusEParadasDaMaquina()">
-                        <option value="1">Máquina 1</option>
-                        <option value="2">Máquina 2</option>
-                        <option value="3">Máquina 3</option>
-                        <option value="4">Máquina 4</option>
-                        <option value="5">Máquina 5</option>
-                        <option value="6">Máquina 6</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Tempo Não Oper. (min):</label>
-                    <input type="number" id="ap-tno" value="0" min="0" oninput="calcularResumo()">
+                    <select id="ap-maquina" onchange="atualizarRegrasDeMaquina()"></select>
                 </div>
             </div>
         </div>
@@ -122,27 +88,100 @@
         <div class="card">
             <h3>2. Ordens de Produção</h3>
             <div id="container-ordens"></div>
-            <button class="btn-secondary" onclick="adicionarOrdem()">+ Adicionar Nova Ordem</button>
+            <button class="btn btn-dash" onclick="adicionarOrdem()">+ Inserir Nova Ordem (OP)</button>
         </div>
 
         <div class="card">
-            <h3>3. Paradas de Máquina</h3>
+            <h3>3. Paradas Operacionais</h3>
             <div id="container-paradas"></div>
-            <button class="btn-secondary" onclick="adicionarParada()">+ Adicionar Nova Parada</button>
+            <button class="btn btn-dash" onclick="adicionarParada()">+ Inserir Nova Parada</button>
         </div>
 
         <div class="card">
             <h3>4. Validação e Envio</h3>
-            <div class="resumo-box" id="box-resumo">
-                <div class="resumo-item"><span>Carga do Turno:</span> <span id="res-carga">0m</span></div>
-                <div class="resumo-item"><span>Tempo Total Apontado:</span> <span id="res-total" class="status-erro">0m</span></div>
-                <div style="border-top: 1px dashed #333; margin: 8px 0;"></div>
-                <div class="resumo-item"><span>Paradas Calculadas (Obrigatório):</span> <span id="res-parada-calc">0m</span></div>
-                <div class="resumo-item"><span>Paradas Apontadas:</span> <span id="res-parada-apon" class="status-erro">0m</span></div>
+            <div class="grid-cards">
+                <div class="mini-card"><div>Counter Turno</div><strong id="card-mc">0</strong></div>
+                <div class="mini-card"><div>Pecas Estoque</div><strong id="card-pecas" style="color: var(--success-color);">0</strong></div>
+                <div class="mini-card"><div>Movimentação</div><strong id="card-mov">0%</strong></div>
+                <div class="mini-card"><div>Loss Geral</div><strong id="card-loss" style="color: var(--danger-color);">0%</strong></div>
             </div>
-            <button class="btn-primary" id="btn-enviar-apontamento" onclick="enviarApontamento()" disabled>Enviar Apontamento</button>
+            <div class="grid-cards" style="margin-bottom: 20px;">
+                <div class="mini-card"><div>Total TNO</div><strong id="card-tno">0m</strong></div>
+                <div class="mini-card"><div>Total Paradas</div><strong id="card-paradas">0m</strong></div>
+            </div>
+
+            <div class="resumo-box">
+                <div class="resumo-item"><span>Carga Exigida do Turno:</span> <span id="res-carga">455m</span></div>
+                <div class="resumo-item"><span>HP Total + TNO Total Lançado:</span> <span id="res-total" class="status-erro">0m</span></div>
+                <div style="border-top: 1px dashed var(--border-color); margin: 6px 0;"></div>
+                <div class="resumo-item"><span>Paradas Reais Calculadas:</span> <span id="res-parada-calc">0m</span></div>
+                <div class="resumo-item"><span>Paradas Lançadas em Ata:</span> <span id="res-parada-apon" class="status-erro">0m</span></div>
+            </div>
+            <button class="btn btn-blue" id="btn-enviar-apontamento" onclick="enviarApontamento()" disabled>Gravar Apontamento de Turno</button>
         </div>
     </div>
+
+    <div id="tela-admin" class="escondido">
+        <h2>Painel de Gestão Industrial</h2>
+        
+        <div class="card">
+            <h3>Histórico de Lançamentos de Turno</h3>
+            <div class="lista-backoffice" id="lista-historico"></div>
+        </div>
+
+        <div class="card">
+            <h3>+ Adicionar Nova Máquina</h3>
+            <div class="grid-2">
+                <div class="form-group"><label>Número da Máquina:</label><input type="number" id="adm-m-numero"></div>
+                <div class="form-group">
+                    <label>Tipo / Segmento:</label>
+                    <select id="adm-m-tipo"><option value="baby_care">Baby Care (Mqs 2 a 6)</option><option value="adult_care">Adulto Geriátrico (Mqs 1 e 7)</option></select>
+                </div>
+            </div>
+            <button class="btn btn-blue" onclick="adicionarMaquinaMestre()">Salvar Máquina</button>
+        </div>
+
+        <div class="card">
+            <h3>+ Adicionar Código de Parada</h3>
+            <div class="grid-3">
+                <div class="form-group">
+                    <label>Segmento:</label>
+                    <select id="adm-p-tipo"><option value="baby_care">Baby Care</option><option value="adult_care">Adulto Care</option></select>
+                </div>
+                <div class="form-group"><label>Nº Código:</label><input type="text" id="adm-p-numero" placeholder="Ex: 01"></div>
+                <div class="form-group"><label>Descrição do Problema:</label><input type="text" id="adm-p-problema" placeholder="Ex: Falha Selagem"></div>
+            </div>
+            <button class="btn btn-blue" onclick="adicionarParadaMestre()">Salvar Código de Parada</button>
+        </div>
+
+        <div class="card">
+            <h3>+ Cadastrar Novo Tipo de TNO</h3>
+            <div class="form-group"><label>Nome da Estratificação de TNO:</label><input type="text" id="adm-tno-nome" placeholder="Ex: Troca de Filtros"></div>
+            <button class="btn btn-blue" onclick="adicionarTnoMestre()">Salvar Tipo de TNO</button>
+        </div>
+
+        <div class="card">
+            <h3>+ Cadastrar Colaborador / Usuário</h3>
+            <div class="grid-2">
+                <div class="form-group"><label>Nome Completo:</label><input type="text" id="adm-u-nome"></div>
+                <div class="form-group"><label>Nome de Usuário (Login):</label><input type="text" id="adm-u-login"></div>
+            </div>
+            <div class="grid-2">
+                <div class="form-group"><label>Senha de Acesso:</label><input type="password" id="adm-u-senha"></div>
+                <div class="form-group">
+                    <label>Nível de Acesso:</label>
+                    <select id="adm-u-nivel"><option value="1">Nível 1 (Operador)</option><option value="2">Nível 2 (Liderança)</option><option value="3">Nível 3 (Admin)</option></select>
+                </div>
+            </div>
+            <button class="btn btn-blue" onclick="adicionarUsuarioMestre()">Salvar Colaborador</button>
+        </div>
+    </div>
+
+    <nav class="nav-inferior escondido" id="menu-navegacao">
+        <button class="nav-item ativo" id="nav-op" onclick="navegarPara('operador')">📝 Apontamento</button>
+        <button class="nav-item restrito-lider-adm" id="nav-adm" onclick="navegarPara('admin')">⚙️ Gestão Central</button>
+        <button class="nav-item" style="color: var(--danger-color);" onclick="sair()">🚪 Sair</button>
+    </nav>
 
 </div>
 
