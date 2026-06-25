@@ -23,34 +23,31 @@ async function executarLogin() {
         
         if (res.ok) {
             usuarioLogado = await res.json();
-            await inicializarPainel();
+            btn.innerText = "Sincronizando Dados...";
+            
+            const dadosBaixados = await baixarDadosMestres();
+            if(dadosBaixados) {
+                inicializarPainel();
+            } else {
+                alert("Falha ao sincronizar o banco. Recarregue a página.");
+                btn.innerText = "Entrar no Sistema"; 
+                btn.disabled = false;
+            }
         } else {
             alert("Credenciais incorretas.");
+            btn.innerText = "Entrar no Sistema"; 
+            btn.disabled = false;
         }
     } catch (e) {
-        alert("O servidor pode estar inicializando. Aguarde 10 segundos e tente novamente!");
-    } finally {
-        btn.innerText = "Acessar Sistema"; 
+        alert("O servidor está despertando. Aguarde alguns segundos e tente novamente.");
+        btn.innerText = "Entrar no Sistema"; 
         btn.disabled = false;
     }
 }
 
-function sair() { location.reload(); }
-
-async function inicializarPainel() {
-    document.getElementById('tela-login').classList.add('escondido');
-    document.getElementById('menu-navegacao').classList.remove('escondido');
-    
-    document.getElementById('txt-user').innerText = `Operador: ${usuarioLogado.nome}`;
-    if (parseInt(usuarioLogado.nivel) >= 2) {
-        document.querySelectorAll('.restrito-lider-adm').forEach(el => el.classList.remove('escondido'));
-    }
-    const inputData = document.getElementById('ap-data');
-    if (inputData) inputData.value = new Date().toISOString().split('T')[0];
-
-    await baixarDadosMestres();
-    preencherSeletoresIniciais();
-    navegarPara('operador');
+function sair() { 
+    usuarioLogado = null;
+    location.reload(); 
 }
 
 async function baixarDadosMestres() {
@@ -63,13 +60,28 @@ async function baixarDadosMestres() {
             MESTRE_TNOS = data.tnos || [];
             MESTRE_MAQUINAS = data.maquinas || [];
             MESTRE_USUARIOS = data.usuarios || [];
-        } else {
-            alert("Erro ao carregar o banco de dados. O painel pode ficar vazio.");
+            return true;
         }
     } catch (e) { console.error("Erro dados mestres", e); }
+    return false;
 }
 
-// ================= NAVEGAÇÃO =================
+function inicializarPainel() {
+    document.getElementById('tela-login').classList.add('escondido');
+    document.getElementById('menu-navegacao').classList.remove('escondido');
+    
+    document.getElementById('txt-user').innerText = `Operador: ${usuarioLogado.nome}`;
+    if (parseInt(usuarioLogado.nivel) >= 2) {
+        document.querySelectorAll('.restrito-lider-adm').forEach(el => el.classList.remove('escondido'));
+    }
+    
+    const inputData = document.getElementById('ap-data');
+    if (inputData) inputData.value = new Date().toISOString().split('T')[0];
+
+    preencherSeletoresIniciais();
+    navegarPara('operador');
+}
+
 function navegarPara(idAba) {
     document.querySelectorAll('.aba-conteudo').forEach(el => el.classList.add('escondido'));
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('ativo'));
@@ -89,13 +101,14 @@ function abrirModal(id) {
 }
 function fecharModal(id) { document.getElementById(id).classList.add('escondido'); }
 
-// ================= TELA APONTAMENTO =================
 function preencherSeletoresIniciais() {
     const selMq = document.getElementById('ap-maquina');
-    if (MESTRE_MAQUINAS.length > 0) {
-        selMq.innerHTML = MESTRE_MAQUINAS.filter(m => m.ativo).map(m => `<option value="${m.numero_maquina}">Máquina ${m.numero_maquina} (${m.tipo==='baby_care'?'Baby':'Adulto'})</option>`).join('');
+    const maqAtivas = MESTRE_MAQUINAS.filter(m => m.ativo);
+    
+    if (maqAtivas.length > 0) {
+        selMq.innerHTML = maqAtivas.map(m => `<option value="${m.numero_maquina}">Máquina ${m.numero_maquina} (${m.tipo==='baby_care'?'Baby':'Adulto'})</option>`).join('');
     } else {
-        selMq.innerHTML = '<option value="">Sem máquinas</option>';
+        selMq.innerHTML = '<option value="">Sem máquinas cadastradas</option>';
     }
     
     document.getElementById('container-ordens').innerHTML = '';
@@ -273,7 +286,8 @@ async function enviarApontamento() {
     document.querySelectorAll(".card-ordem").forEach(div => {
         const tnos = [];
         div.querySelectorAll('.card-tno').forEach(t => {
-            tnos.push({ tipo_tno: t.querySelector('.tno-tipo').value, tempo_tno: parseInt(t.querySelector('.tno-minutos').value || 0) });
+            const tipo = t.querySelector('.tno-tipo').value;
+            if (tipo) tnos.push({ tipo_tno: tipo, tempo_tno: parseInt(t.querySelector('.tno-minutos').value || 0) });
         });
 
         payload.ordens.push({
@@ -308,7 +322,7 @@ async function enviarApontamento() {
         } else {
             const err = await res.json(); alert(`Erro: ${err.detail}`);
         }
-    } catch(e) { alert("Erro de rede ao salvar apontamento."); }
+    } catch(e) { alert("Falha na rede. O banco de dados pode estar sobrecarregado, aguarde um minuto e tente salvar novamente."); }
     finally { btn.innerText = editandoTurnoId ? "Atualizar Turno" : "Gravar Apontamento"; calcularResumo(); }
 }
 
@@ -323,7 +337,6 @@ function cancelarEdicaoApontamento() {
     adicionarOrdem();
 }
 
-// ================= TELA LANÇAMENTOS (FILTROS) =================
 async function filtrarLancamentos() {
     const data = document.getElementById('filtro-data').value;
     const turno = document.getElementById('filtro-turno').value;
@@ -415,10 +428,9 @@ async function carregarParaEdicao(id) {
 
             calcularResumo();
         }
-    } catch(e) { alert("Erro ao carregar turno."); }
+    } catch(e) { alert("Erro ao carregar turno do banco."); }
 }
 
-// ================= TELA VISÃO OP =================
 async function carregarVisaoOP() {
     try {
         const res = await fetch(`${API_URL}/visao-ordens`);
@@ -441,7 +453,6 @@ async function carregarVisaoOP() {
     } catch(e) {}
 }
 
-// ================= GESTÃO ADMIN (CRUD) =================
 function renderizarGestao() {
     document.getElementById('lista-admin-skus').innerHTML = MESTRE_SKUS.map(s => `
         <div class="item-list"><div><strong>${s.codigo_sku}</strong> - ${s.descricao}</div>
@@ -498,7 +509,7 @@ function preencherEdicao(tipo, id) {
 }
 
 async function deletarMestre(rota, id) {
-    if(!confirm("Tem certeza que deseja excluir?")) return;
+    if(!confirm("Tem certeza que deseja excluir permanentemente este registro?")) return;
     await fetch(`${API_URL}/admin/${rota}/${id}`, {method:'DELETE'});
     await baixarDadosMestres(); renderizarGestao(); preencherSeletoresIniciais();
 }
@@ -510,7 +521,7 @@ async function salvarMestreGenerico(rota, idForm, payload, modalId) {
     try {
         await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
         fecharModal(modalId); await baixarDadosMestres(); renderizarGestao(); preencherSeletoresIniciais();
-    } catch(e) { alert("Erro ao salvar."); }
+    } catch(e) { alert("Erro ao salvar no banco."); }
 }
 
 function salvarSku() {
