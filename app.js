@@ -5,17 +5,20 @@ let MESTRE_SKUS = [], MESTRE_PARADAS = [], MESTRE_TNOS = [], MESTRE_MAQUINAS = [
 let contadorOrdens = 0, contadorParadas = 0, contadorTnos = 0;
 let editandoTurnoId = null;
 
+// LÓGICA CLÁSSICA E DIRETA (Igual ao da Barbearia)
 async function executarLogin() {
     const login = document.getElementById('login-usuario').value.trim();
     const senha = document.getElementById('login-senha').value.trim();
     if (!login || !senha) return alert("Insira suas credenciais.");
     
     const btn = document.getElementById('btn-entrar'); 
-    btn.innerText = "Conectando ao banco... (pode levar 50s)"; btn.disabled = true;
+    btn.innerText = "Conectando..."; 
+    btn.disabled = true;
 
     try {
         const res = await fetch(`${API_URL}/usuarios/auth`, {
-            method: 'POST', headers: {'Content-Type': 'application/json'},
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ login, senha })
         });
         
@@ -26,9 +29,10 @@ async function executarLogin() {
             alert("Credenciais incorretas.");
         }
     } catch (e) {
-        alert("O servidor gratuito do Render estava dormindo. Por favor, clique em Entrar no Sistema novamente!");
+        alert("Servidor inicializando. Aguarde 10 segundos e clique em entrar novamente.");
     } finally {
-        btn.innerText = "Entrar no Sistema"; btn.disabled = false;
+        btn.innerText = "Entrar no Sistema"; 
+        btn.disabled = false;
     }
 }
 
@@ -63,7 +67,7 @@ async function baixarDadosMestres() {
         } else {
             alert("Erro ao carregar o banco de dados. O painel pode ficar vazio.");
         }
-    } catch (e) { console.error("Erro", e); }
+    } catch (e) { console.error("Erro dados mestres", e); }
 }
 
 // ================= NAVEGAÇÃO =================
@@ -141,7 +145,7 @@ function adicionarOrdem() {
             </div>
 
             <div style="font-size:13px; color:var(--success-color); font-weight:bold; margin-top:10px;" id="ordem-calc-${contadorOrdens}">Estoque: 0 | Mov: 0% | Loss: 0%</div>
-            <button class="btn-small-delete" style="margin-top:10px;" onclick="removerItem('ordem-${contadorOrdens}')">Excluir Ordem</button>
+            <button class="btn-small-delete" onclick="removerItem('ordem-${contadorOrdens}')">Excluir Ordem</button>
         </div>`;
     container.insertAdjacentHTML('beforeend', html);
     atualizarDescricaoSku(contadorOrdens);
@@ -192,6 +196,7 @@ function buscarDescricaoParada(inputEl, idCard) {
 }
 
 function removerItem(id) { document.getElementById(id).remove(); calcularResumo(); }
+
 function atualizarDescricaoSku(idCard) {
     const skuCod = document.querySelector(`#ordem-${idCard} .op-sku`).value;
     const sku = MESTRE_SKUS.find(s => s.codigo_sku === skuCod);
