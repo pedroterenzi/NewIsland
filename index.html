@@ -4,26 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Unicharm - Controle de Produção</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg-color: #0b1329;
             --card-bg: #131a35;
             --accent-blue: #3b82f6; 
-            --accent-blue-hover: #1d4ed8;
             --accent-orange: #f97316; 
-            --accent-orange-hover: #ea580c;
             --text-color: #f8fafc;
             --text-muted: #94a3b8;
             --border-color: #334155;
             --success-color: #10b981;
             --danger-color: #ef4444;
         }
-
         * { box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; }
-        body { background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 0; display: flex; justify-content: center; padding-bottom: 120px; letter-spacing: -0.3px; overflow-x: hidden; }
+        body { background-color: var(--bg-color); color: var(--text-color); margin: 0; display: flex; justify-content: center; padding-bottom: 120px; overflow-x: hidden; }
         .app-container { width: 100%; max-width: 600px; padding: 16px; margin: 0 auto; overflow-x: hidden; }
         
         .card { background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%); border: 1px solid var(--border-color); padding: 24px; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 8px 30px rgba(0,0,0,0.5); width: 100%; }
@@ -51,9 +46,10 @@
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
         
-        .kpi-card { background: #0f172a; border: 1px solid #334155; padding: 16px; border-radius: 16px; text-align: center;}
-        .kpi-card .kpi-label { font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;}
-        .kpi-card .kpi-val { font-size: 20px; font-weight: 800; margin-top: 6px; letter-spacing: -0.5px; }
+        .grid-indicadores { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px; }
+        .kpi-card { background: #0f172a; border: 1px solid #334155; padding: 20px; border-radius: 16px; display: flex; flex-direction: column; align-items: center; text-align: center;}
+        .kpi-card .kpi-label { font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;}
+        .kpi-card .kpi-val { font-size: 22px; font-weight: 800; margin-top: 8px; letter-spacing: -0.5px; }
         
         .resumo-box { background: rgba(37, 99, 235, 0.05); border: 1px solid rgba(37, 99, 235, 0.2); padding: 16px; border-radius: 14px; margin-bottom: 20px; }
         .resumo-item { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 6px; }
@@ -73,11 +69,11 @@
         .modal-content { background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%); border: 1px solid #334155; border-radius: 20px; padding: 28px; width: 100%; max-width: 420px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 40px rgba(0,0,0,0.6);}
         
         /* Tabela Premium Estilo Totvs/BI */
-        .table-wrapper { width: 100%; overflow-x: auto; border-radius: 12px; border: 1px solid var(--border-color); background: #0f172a; }
-        .table-premium { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; white-space: nowrap; }
-        .table-premium th { background: rgba(37, 99, 235, 0.1); color: var(--accent-blue); padding: 16px; font-weight: 700; border-bottom: 2px solid var(--border-color); text-transform: uppercase; letter-spacing: 0.5px; }
-        .table-premium td { padding: 16px; border-bottom: 1px solid rgba(51, 65, 85, 0.5); color: var(--text-color); }
-        .table-premium tr:hover td { background: rgba(255, 255, 255, 0.02); }
+        .table-wrapper { width: 100%; overflow-x: auto; border-radius: 12px; border: 1px solid var(--border-color); background: #0f172a; box-shadow: inset 0 4px 6px rgba(0,0,0,0.1);}
+        .table-premium { width: 100%; border-collapse: separate; border-spacing: 0; text-align: left; font-size: 13px; white-space: nowrap; }
+        .table-premium th { background: #1e293b; color: var(--accent-orange); padding: 16px; font-weight: 700; border-bottom: 2px solid var(--border-color); text-transform: uppercase; letter-spacing: 0.5px; position: sticky; top: 0; z-index: 2;}
+        .table-premium td { padding: 16px; border-bottom: 1px solid #1e293b; color: var(--text-color); transition: background 0.2s;}
+        .table-premium tr:hover td { background: rgba(37, 99, 235, 0.1); }
         .table-premium tr:last-child td { border-bottom: none; }
         .badge-success { background: rgba(16, 185, 129, 0.1); color: var(--success-color); padding: 4px 8px; border-radius: 6px; font-weight: 700; }
         .badge-danger { background: rgba(239, 68, 68, 0.1); color: var(--danger-color); padding: 4px 8px; border-radius: 6px; font-weight: 700; }
@@ -125,7 +121,7 @@
 
         <div class="card">
             <h3>4. Validação & Resumo do Turno</h3>
-            <div class="grid-2">
+            <div class="grid-indicadores">
                 <div class="kpi-card"><div class="kpi-label">Counter Turno</div><div class="kpi-val" id="card-mc">0</div></div>
                 <div class="kpi-card"><div class="kpi-label">Peças Estoque</div><div class="kpi-val" id="card-pecas" style="color: var(--success-color);">0</div></div>
                 <div class="kpi-card"><div class="kpi-label">Movimentação</div><div class="kpi-val" id="card-mov">0%</div></div>
@@ -134,7 +130,7 @@
                 <div class="kpi-card"><div class="kpi-label">Total Paradas</div><div class="kpi-val" id="card-paradas">0m</div></div>
             </div>
 
-            <div class="resumo-box" style="margin-top: 15px;">
+            <div class="resumo-box">
                 <div class="resumo-item"><span>Carga Padrão Turno:</span> <span id="res-carga">455m</span></div>
                 <div class="resumo-item"><span>HP Total + TNO Lançado:</span> <span id="res-total" class="status-erro">0m</span></div>
                 <div style="border-top: 1px dashed var(--border-color); margin: 8px 0;"></div>
@@ -147,9 +143,9 @@
     </div>
 
     <div id="tela-lancamentos" class="escondido aba-conteudo">
-        <h2 style="text-align: left; margin-bottom: 20px; color: var(--accent-blue);">Lançamentos</h2>
+        <h2 style="text-align: left; margin-bottom: 20px; color: var(--accent-blue);">Lançamentos de Turno</h2>
         <div class="card">
-            <h3 style="color: var(--accent-orange);">Filtros de Busca</h3>
+            <h3 style="color: var(--accent-orange);">Filtros Dinâmicos</h3>
             <div class="grid-2">
                 <div class="form-group"><label>Data:</label><input type="date" id="filtro-data" onchange="filtrarLancamentos()"></div>
                 <div class="form-group"><label>Turno:</label><select id="filtro-turno" onchange="filtrarLancamentos()"><option value="">Todos</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></div>
@@ -181,7 +177,7 @@
         <div class="card">
             <h3>Máquinas da Planta</h3>
             <button class="btn-dash" onclick="abrirModal('modal-maq')">+ Adicionar Máquina</button>
-            <div id="lista-admin-maquinas"></div>
+            <div id="lista-admin-maquinas" style="max-height: 250px; overflow-y:auto;"></div>
         </div>
 
         <div class="card">
@@ -199,13 +195,13 @@
         <div class="card">
             <h3>Tipos de TNO</h3>
             <button class="btn-dash" onclick="abrirModal('modal-tno')">+ Adicionar Classificação TNO</button>
-            <div id="lista-admin-tnos"></div>
+            <div id="lista-admin-tnos" style="max-height: 250px; overflow-y:auto;"></div>
         </div>
 
         <div class="card">
             <h3>Equipe (Usuários)</h3>
             <button class="btn-dash" onclick="abrirModal('modal-usuario')">+ Adicionar Usuário</button>
-            <div id="lista-admin-usuarios"></div>
+            <div id="lista-admin-usuarios" style="max-height: 250px; overflow-y:auto;"></div>
         </div>
     </div>
 
