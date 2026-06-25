@@ -18,76 +18,29 @@ app.add_middleware(
 DATABASE_URL = "postgresql://neondb_owner:npg_G9jBAgO0hpXr@ep-broad-sky-ate4cjbm.c-9.us-east-1.aws.neon.tech/neondb?sslmode=require"
 
 def inicializar_banco():
-    # Função blindada: Executa SQL ignorando erros individuais para não derrubar o resto
-    def sql_seguro(conn, query, params=None):
-        try:
-            cursor = conn.cursor()
-            if params: cursor.execute(query, params)
-            else: cursor.execute(query)
-            conn.commit()
-            cursor.close()
-        except Exception as e:
-            print(f"Erro ignorado no setup: {e}")
-            conn.rollback()
-
     try:
         conn = psycopg2.connect(DATABASE_URL)
-        
-        # Limpeza Inicial se o schema antigo existir
         cursor = conn.cursor()
+        
+        # 1. Verifica se precisa limpar o banco velho
         cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_name='ordem_tno';")
         if not cursor.fetchone():
             cursor.execute("DROP TABLE IF EXISTS ordem_tno, result_by_order, stop_machine_item, registro_turnos, codigos_parada, master_sku, tipos_tno, maquinas, usuarios CASCADE;")
             conn.commit()
-        cursor.close()
 
-        # 1. Usuários
-        sql_seguro(conn, "CREATE TABLE IF NOT EXISTS usuarios (id SERIAL PRIMARY KEY, login VARCHAR(100) UNIQUE NOT NULL, senha VARCHAR(100) NOT NULL, nome VARCHAR(255) NOT NULL, nivel INT DEFAULT 1);")
-        sql_seguro(conn, "INSERT INTO usuarios (login, senha, nome, nivel) VALUES ('admin', 'admin', 'Administrador Global', 3) ON CONFLICT (login) DO NOTHING;")
-
-        # 2. Máquinas
-        sql_seguro(conn, "CREATE TABLE IF NOT EXISTS maquinas (id SERIAL PRIMARY KEY, numero_maquina INT UNIQUE NOT NULL, tipo VARCHAR(50) NOT NULL, ativo BOOLEAN DEFAULT TRUE);")
-        maquinas = [(1, 'adult_care'), (2, 'baby_care'), (3, 'baby_care'), (4, 'baby_care'), (5, 'baby_care'), (6, 'baby_care'), (7, 'adult_care')]
-        for n, t in maquinas:
-            sql_seguro(conn, "INSERT INTO maquinas (numero_maquina, tipo) VALUES (%s, %s) ON CONFLICT (numero_maquina) DO NOTHING;", (n, t))
-
-        # 3. Tipos de TNO
-        sql_seguro(conn, "CREATE TABLE IF NOT EXISTS tipos_tno (id SERIAL PRIMARY KEY, nome VARCHAR(100) UNIQUE NOT NULL);")
-        tnos = ['Manutenção', 'Limpeza', 'Ajuste de Partida de Máquina', 'Troca de Tamanho de Máquina', 'Ajuste Após Troca de Tamanho Máquina', 'Troca de Optima', 'Troca de Dosetec', 'Checagem de Liberação do Operador', 'Parada Programada', 'Parada por Falta / Problema de MP', 'Liberação de Linha Qualidade', 'Amostragem (Sampling)', 'Segurança do Trabalho', 'Outros']
-        for tno in tnos:
-            sql_seguro(conn, "INSERT INTO tipos_tno (nome) VALUES (%s) ON CONFLICT (nome) DO NOTHING;", (tno,))
-
-        # 4. SKUs
-        sql_seguro(conn, """
+        # 2. Criação rápida de todas as tabelas
+        cursor.execute("CREATE TABLE IF NOT EXISTS usuarios (id SERIAL PRIMARY KEY, login VARCHAR(100) UNIQUE NOT NULL, senha VARCHAR(100) NOT NULL, nome VARCHAR(255) NOT NULL, nivel INT DEFAULT 1);")
+        cursor.execute("CREATE TABLE IF NOT EXISTS maquinas (id SERIAL PRIMARY KEY, numero_maquina INT UNIQUE NOT NULL, tipo VARCHAR(50) NOT NULL, ativo BOOLEAN DEFAULT TRUE);")
+        cursor.execute("CREATE TABLE IF NOT EXISTS tipos_tno (id SERIAL PRIMARY KEY, nome VARCHAR(100) UNIQUE NOT NULL);")
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS master_sku (
                 id SERIAL PRIMARY KEY, codigo_sku VARCHAR(100) UNIQUE NOT NULL, descricao VARCHAR(255),
                 fraldas_por_pacote INT NOT NULL, pacotes_por_fardo INT NOT NULL, fardos_por_pallet INT NOT NULL
             );
         """)
-        skus_carga = [
-            ('1000', 'RN-TESTE', 4, 63, 18), ('2000', 'P-TESTE', 4, 48, 18), ('3000', 'M-TESTE', 1, 120, 18), 
-            ('4000', 'G-TESTE', 1, 120, 18), ('5000', 'XG-TESTE', 1, 100, 18), ('6000', 'XXG-TESTE', 1, 100, 18),
-            ('11151', 'P50 IGUAÇU', 50, 4, 25), ('12111', 'M20 IGUAÇU', 20, 6, 30), ('12121', 'G17 IGUAÇU', 17, 6, 36), 
-            ('12131', 'XG15 IGUAÇU', 15, 6, 36), ('12141', 'P24 Cuidado Real', 24, 6, 24), ('12151', 'XXG13 IGUAÇU', 13, 6, 32),
-            ('12161', 'M18 IGUAÇU', 18, 6, 36), ('12171', 'G16 IGUAÇU', 16, 6, 30), ('12181', 'XG14 IGUAÇU', 14, 6, 36),
-            ('12191', 'XXG12 IGUAÇU', 12, 6, 32), ('12201', 'P22 IGUAÇU', 22, 6, 30), ('12301', 'RN20 D&N', 20, 6, 30),
-            ('13101', 'G28 D&N', 28, 4, 32), ('13201', 'XG24 D&N', 24, 4, 32), ('13301', 'XXG22 SP', 22, 4, 36),
-            ('13401', 'M34 SP', 34, 4, 30), ('14101', 'M34 Super Proteção', 34, 4, 30), ('14201', 'M18 Super Proteção', 18, 6, 36),
-            ('21111', 'RG 20 PAD', 20, 6, 24), ('32321', 'G30 CR Pelé', 30, 4, 30), ('32131', 'XG26 CR Senna', 26, 4, 36)
-        ]
-        for s in skus_carga:
-            sql_seguro(conn, "INSERT INTO master_sku (codigo_sku, descricao, fraldas_por_pacote, pacotes_por_fardo, fardos_por_pallet) VALUES (%s, %s, %s, %s, %s) ON CONFLICT (codigo_sku) DO NOTHING;", s)
-
-        # 5. Códigos Parada
-        sql_seguro(conn, "CREATE TABLE IF NOT EXISTS codigos_parada (id SERIAL PRIMARY KEY, tipo_maquina VARCHAR(50) NOT NULL, numero VARCHAR(50) NOT NULL, problema VARCHAR(255) NOT NULL, UNIQUE(tipo_maquina, numero));")
-        paradas_baby = [('1', 'Problemas triturador'), ('2', 'Linha Pulp'), ('101', 'OPTIMA STACKER'), ('124', 'Defeito SAP')]
-        paradas_adult = [('1', 'Problemas triturador'), ('2', 'Linha Pulp'), ('93', 'Optima Stacker')]
-        for num, prob in paradas_baby: sql_seguro(conn, "INSERT INTO codigos_parada (tipo_maquina, numero, problema) VALUES ('baby_care', %s, %s) ON CONFLICT (tipo_maquina, numero) DO NOTHING;", (num, prob))
-        for num, prob in paradas_adult: sql_seguro(conn, "INSERT INTO codigos_parada (tipo_maquina, numero, problema) VALUES ('adult_care', %s, %s) ON CONFLICT (tipo_maquina, numero) DO NOTHING;", (num, prob))
-
-        # 6. Tabelas do Apontamento
-        sql_seguro(conn, "CREATE TABLE IF NOT EXISTS registro_turnos (id SERIAL PRIMARY KEY, data_registro DATE NOT NULL, turno INT NOT NULL, operador VARCHAR(255) NOT NULL, maquina_numero INT NOT NULL);")
-        sql_seguro(conn, """
+        cursor.execute("CREATE TABLE IF NOT EXISTS codigos_parada (id SERIAL PRIMARY KEY, tipo_maquina VARCHAR(50) NOT NULL, numero VARCHAR(50) NOT NULL, problema VARCHAR(255) NOT NULL, UNIQUE(tipo_maquina, numero));")
+        cursor.execute("CREATE TABLE IF NOT EXISTS registro_turnos (id SERIAL PRIMARY KEY, data_registro DATE NOT NULL, turno INT NOT NULL, operador VARCHAR(255) NOT NULL, maquina_numero INT NOT NULL);")
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS result_by_order (
                 id SERIAL PRIMARY KEY, turno_id INT REFERENCES registro_turnos(id) ON DELETE CASCADE,
                 ordem VARCHAR(100) NOT NULL, codigo_sku VARCHAR(100) NOT NULL, horario_padrao INT NOT NULL,
@@ -95,12 +48,43 @@ def inicializar_banco():
                 total_pecas_estoque INT NOT NULL, taxa_movimentacao NUMERIC(5,2), taxa_loss NUMERIC(5,2)
             );
         """)
-        sql_seguro(conn, "CREATE TABLE IF NOT EXISTS ordem_tno (id SERIAL PRIMARY KEY, ordem_id INT REFERENCES result_by_order(id) ON DELETE CASCADE, tipo_tno VARCHAR(100) NOT NULL, tempo_tno INT NOT NULL);")
-        sql_seguro(conn, "CREATE TABLE IF NOT EXISTS stop_machine_item (id SERIAL PRIMARY KEY, turno_id INT REFERENCES registro_turnos(id) ON DELETE CASCADE, numero_parada VARCHAR(50) NOT NULL, minutos_parados INT NOT NULL);")
-        
+        cursor.execute("CREATE TABLE IF NOT EXISTS ordem_tno (id SERIAL PRIMARY KEY, ordem_id INT REFERENCES result_by_order(id) ON DELETE CASCADE, tipo_tno VARCHAR(100) NOT NULL, tempo_tno INT NOT NULL);")
+        cursor.execute("CREATE TABLE IF NOT EXISTS stop_machine_item (id SERIAL PRIMARY KEY, turno_id INT REFERENCES registro_turnos(id) ON DELETE CASCADE, numero_parada VARCHAR(50) NOT NULL, minutos_parados INT NOT NULL);")
+        conn.commit()
+
+        # 3. Carga Inicial em Massa (Execução única super rápida)
+        cursor.execute("SELECT id FROM usuarios WHERE login = 'admin';")
+        if not cursor.fetchone():
+            cursor.execute("INSERT INTO usuarios (login, senha, nome, nivel) VALUES ('admin', 'admin', 'Administrador Global', 3);")
+
+        cursor.execute("SELECT COUNT(*) FROM maquinas;")
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("INSERT INTO maquinas (numero_maquina, tipo) VALUES (1, 'adult_care'), (2, 'baby_care'), (3, 'baby_care'), (4, 'baby_care'), (5, 'baby_care'), (6, 'baby_care'), (7, 'adult_care');")
+
+        cursor.execute("SELECT COUNT(*) FROM tipos_tno;")
+        if cursor.fetchone()[0] == 0:
+            tnos = [('Manutenção',), ('Limpeza',), ('Ajuste de Partida de Máquina',), ('Troca de Tamanho de Máquina',), ('Ajuste Após Troca de Tamanho Máquina',), ('Troca de Optima',), ('Troca de Dosetec',), ('Checagem de Liberação do Operador',), ('Parada Programada',), ('Parada por Falta / Problema de MP',), ('Liberação de Linha Qualidade',), ('Amostragem (Sampling)',), ('Segurança do Trabalho',), ('Outros',)]
+            args_str = ','.join(cursor.mogrify("(%s)", x).decode('utf-8') for x in tnos)
+            cursor.execute(f"INSERT INTO tipos_tno (nome) VALUES {args_str} ON CONFLICT DO NOTHING;")
+
+        cursor.execute("SELECT COUNT(*) FROM master_sku;")
+        if cursor.fetchone()[0] == 0:
+            skus = [('1000', 'RN-TESTE', 4, 63, 18), ('2000', 'P-TESTE', 4, 48, 18), ('3000', 'M-TESTE', 1, 120, 18), ('4000', 'G-TESTE', 1, 120, 18), ('5000', 'XG-TESTE', 1, 100, 18), ('6000', 'XXG-TESTE', 1, 100, 18), ('11151', 'P50 IGUAÇU', 50, 4, 25), ('12111', 'M20 IGUAÇU', 20, 6, 30), ('12121', 'G17 IGUAÇU', 17, 6, 36), ('12131', 'XG15 IGUAÇU', 15, 6, 36), ('12141', 'P24 Cuidado Real', 24, 6, 24), ('12151', 'XXG13 IGUAÇU', 13, 6, 32), ('12161', 'M18 IGUAÇU', 18, 6, 36), ('12171', 'G16 IGUAÇU', 16, 6, 30), ('12181', 'XG14 IGUAÇU', 14, 6, 36), ('12191', 'XXG12 IGUAÇU', 12, 6, 32), ('12201', 'P22 IGUAÇU', 22, 6, 30), ('12301', 'RN20 D&N', 20, 6, 30), ('13101', 'G28 D&N', 28, 4, 32), ('13201', 'XG24 D&N', 24, 4, 32), ('13301', 'XXG22 SP', 22, 4, 36), ('13401', 'M34 SP', 34, 4, 30), ('14101', 'M34 Super Proteção', 34, 4, 30), ('14201', 'M18 Super Proteção', 18, 6, 36), ('21111', 'RG 20 PAD', 20, 6, 24), ('32321', 'G30 CR Pelé', 30, 4, 30), ('32131', 'XG26 CR Senna', 26, 4, 36)]
+            args_str = ','.join(cursor.mogrify("(%s,%s,%s,%s,%s)", x).decode('utf-8') for x in skus)
+            cursor.execute(f"INSERT INTO master_sku (codigo_sku, descricao, fraldas_por_pacote, pacotes_por_fardo, fardos_por_pallet) VALUES {args_str} ON CONFLICT DO NOTHING;")
+
+        cursor.execute("SELECT COUNT(*) FROM codigos_parada;")
+        if cursor.fetchone()[0] == 0:
+            paradas = [('baby_care', '1', 'Problemas triturador'), ('baby_care', '2', 'Linha Pulp'), ('baby_care', '101', 'OPTIMA STACKER'), ('baby_care', '124', 'Defeito SAP'), ('adult_care', '1', 'Problemas triturador'), ('adult_care', '2', 'Linha Pulp'), ('adult_care', '93', 'Optima Stacker')]
+            args_str = ','.join(cursor.mogrify("(%s,%s,%s)", x).decode('utf-8') for x in paradas)
+            cursor.execute(f"INSERT INTO codigos_parada (tipo_maquina, numero, problema) VALUES {args_str} ON CONFLICT DO NOTHING;")
+            
+        conn.commit()
+        cursor.close()
         conn.close()
-        print("⚡ Banco de Dados Indestrutível Carregado!")
-    except Exception as e: print(f"Falha Geral: {str(e)}")
+        print("⚡ Banco de Dados Carregado em Massa com Sucesso!")
+    except Exception as e:
+        print(f"Erro na Carga Inicial: {str(e)}")
 
 inicializar_banco()
 
@@ -123,7 +107,7 @@ class PayloadApontamento(BaseModel): data_registro: str; turno: int; operador: s
 @app.post("/usuarios/auth")
 def autenticar(obj: ModelAuth):
     login = obj.login.strip().lower()
-    if login == "admin" and obj.senha == "admin": return {"login": "admin", "nome": "Administrador", "nivel": 3}
+    if login == "admin" and obj.senha == "admin": return {"login": "admin", "nome": "Administrador Global", "nivel": 3}
     try:
         conn = psycopg2.connect(DATABASE_URL)
         cursor = conn.cursor(cursor_factory=RealDictCursor)
