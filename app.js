@@ -5,35 +5,40 @@ let MESTRE_SKUS = [], MESTRE_PARADAS = [], MESTRE_TNOS = [], MESTRE_MAQUINAS = [
 let contadorOrdens = 0, contadorParadas = 0, contadorTnos = 0;
 let editandoTurnoId = null;
 
-// LÓGICA CLÁSSICA E DIRETA (Igual ao da Barbearia)
 async function executarLogin() {
     const login = document.getElementById('login-usuario').value.trim();
     const senha = document.getElementById('login-senha').value.trim();
     if (!login || !senha) return alert("Insira suas credenciais.");
     
     const btn = document.getElementById('btn-entrar'); 
-    btn.innerText = "Conectando..."; 
-    btn.disabled = true;
+    btn.innerText = "Conectando ao banco... (pode levar 50s)"; btn.disabled = true;
 
-    try {
-        const res = await fetch(`${API_URL}/usuarios/auth`, {
-            method: 'POST', 
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ login, senha })
-        });
-        
-        if (res.ok) {
-            usuarioLogado = await res.json();
-            await inicializarPainel();
-        } else {
-            alert("Credenciais incorretas.");
+    let tentativas = 0;
+    while(tentativas < 2) {
+        try {
+            const res = await fetch(`${API_URL}/usuarios/auth`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ login, senha })
+            });
+            if (res.ok) {
+                usuarioLogado = await res.json();
+                await inicializarPainel();
+                return;
+            } else {
+                alert("Credenciais incorretas.");
+                btn.innerText = "Entrar no Sistema"; btn.disabled = false;
+                return;
+            }
+        } catch (e) {
+            tentativas++;
+            if(tentativas >= 2) {
+                alert("Erro de conexão persistente. Verifique sua internet ou tente novamente.");
+            } else {
+                await new Promise(r => setTimeout(r, 3000));
+            }
         }
-    } catch (e) {
-        alert("Servidor inicializando. Aguarde 10 segundos e clique em entrar novamente.");
-    } finally {
-        btn.innerText = "Entrar no Sistema"; 
-        btn.disabled = false;
     }
+    btn.innerText = "Entrar no Sistema"; btn.disabled = false;
 }
 
 function sair() { location.reload(); }
@@ -49,25 +54,34 @@ async function inicializarPainel() {
     const inputData = document.getElementById('ap-data');
     if (inputData) inputData.value = new Date().toISOString().split('T')[0];
 
+    // Aqui o App vai baixar os dados e recarregar a tela automaticamente
     await baixarDadosMestres();
     preencherSeletoresIniciais();
     navegarPara('operador');
 }
 
+// CORREÇÃO: Função com tentativa silenciosa automática (Auto-Retry)
 async function baixarDadosMestres() {
-    try {
-        const res = await fetch(`${API_URL}/dados-mestres`);
-        if (res.ok) {
-            const data = await res.json();
-            MESTRE_SKUS = data.skus || [];
-            MESTRE_PARADAS = data.paradas || [];
-            MESTRE_TNOS = data.tnos || [];
-            MESTRE_MAQUINAS = data.maquinas || [];
-            MESTRE_USUARIOS = data.usuarios || [];
-        } else {
-            alert("Erro ao carregar o banco de dados. O painel pode ficar vazio.");
+    let tentativas = 0;
+    while (tentativas < 3) {
+        try {
+            const res = await fetch(`${API_URL}/dados-mestres`);
+            if (res.ok) {
+                const data = await res.json();
+                MESTRE_SKUS = data.skus || [];
+                MESTRE_PARADAS = data.paradas || [];
+                MESTRE_TNOS = data.tnos || [];
+                MESTRE_MAQUINAS = data.maquinas || [];
+                MESTRE_USUARIOS = data.usuarios || [];
+                return; // Se deu certo, sai da função
+            }
+        } catch (e) {
+            console.warn("Tentativa de carregar dados falhou. Retentando em segundo plano...");
         }
-    } catch (e) { console.error("Erro dados mestres", e); }
+        tentativas++;
+        await new Promise(r => setTimeout(r, 1500)); // Espera 1.5s antes de tentar de novo
+    }
+    console.error("Falha ao sincronizar dados mestres com o servidor.");
 }
 
 // ================= NAVEGAÇÃO =================
