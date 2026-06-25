@@ -14,6 +14,9 @@ async function executarLogin() {
     const senha = document.getElementById('login-senha').value.trim();
     if (!login || !senha) return alert("Insira suas credenciais.");
 
+    const btn = document.getElementById('btn-entrar');
+    btn.innerText = "Conectando..."; btn.disabled = true;
+
     try {
         const res = await fetch(`${API_URL}/usuarios/auth`, {
             method: 'POST',
@@ -23,12 +26,14 @@ async function executarLogin() {
 
         if (res.ok) {
             usuarioLogado = await res.json();
-            inicializarPainel();
+            await inicializarPainel();
         } else {
             alert("Credenciais incorretas.");
         }
     } catch (e) {
-        alert("Erro de conexão com o servidor.");
+        alert("Erro de conexão com o servidor. Aguarde uns segundos e tente novamente.");
+    } finally {
+        btn.innerText = "Entrar no Sistema"; btn.disabled = false;
     }
 }
 
@@ -51,6 +56,9 @@ async function inicializarPainel() {
         document.querySelectorAll('.restrito-lider-adm').forEach(el => el.classList.add('escondido'));
     }
 
+    const inputData = document.getElementById('ap-data');
+    if (inputData) inputData.value = new Date().toISOString().split('T')[0];
+
     await baixarDadosMestres();
     preencherSeletoresIniciais();
     navegarPara('operador');
@@ -61,21 +69,28 @@ async function baixarDadosMestres() {
         const res = await fetch(`${API_URL}/dados-mestres`);
         if (res.ok) {
             const data = await res.json();
-            MESTRE_SKUS = data.skus;
-            MESTRE_PARADAS = data.paradas;
-            MESTRE_TNOS = data.tnos;
-            MESTRE_MAQUINAS = data.maquinas;
+            MESTRE_SKUS = data.skus || [];
+            MESTRE_PARADAS = data.paradas || [];
+            MESTRE_TNOS = data.tnos || [];
+            MESTRE_MAQUINAS = data.maquinas || [];
+        } else {
+            alert("Erro ao sincronizar banco de dados.");
         }
     } catch (e) { console.error("Erro dados mestres", e); }
 }
 
 function preencherSeletoresIniciais() {
     const selMq = document.getElementById('ap-maquina');
-    selMq.innerHTML = MESTRE_MAQUINAS.map(m => `<option value="${m.numero_maquina}">${m.numero_maquina}</option>`).join('');
+    if (MESTRE_MAQUINAS.length > 0) {
+        selMq.innerHTML = MESTRE_MAQUINAS.map(m => `<option value="${m.numero_maquina}">Máquina ${m.numero_maquina} (${m.tipo === 'baby_care' ? 'Baby' : 'Adulto'})</option>`).join('');
+    } else {
+        selMq.innerHTML = '<option value="">Sem máquinas cadastradas</option>';
+    }
     
     document.getElementById('container-ordens').innerHTML = '';
     document.getElementById('container-paradas').innerHTML = '';
     contadorOrdens = 0; contadorParadas = 0;
+    
     adicionarOrdem();
     atualizarRegrasDeMaquina();
 }
@@ -100,8 +115,11 @@ function adicionarOrdem() {
     contadorOrdens++;
     const container = document.getElementById('container-ordens');
     
-    const skuOpts = MESTRE_SKUS.map(s => `<option value="${s.codigo_sku}">${s.codigo_sku}</option>`).join('');
-    const tnoOpts = MESTRE_TNOS.map(t => `<option value="${t.nome}">${t.nome}</option>`).join('');
+    let skuOpts = '<option value="">Selecione o SKU</option>';
+    skuOpts += MESTRE_SKUS.map(s => `<option value="${s.codigo_sku}">${s.codigo_sku}</option>`).join('');
+    
+    let tnoOpts = '<option value="">Nenhum</option>';
+    tnoOpts += MESTRE_TNOS.map(t => `<option value="${t.nome}">${t.nome}</option>`).join('');
 
     const html = `
         <div class="dynamic-item" id="ordem-${contadorOrdens}">
@@ -112,7 +130,7 @@ function adicionarOrdem() {
                     <select class="op-sku" onchange="atualizarDescricaoSku(${contadorOrdens})">${skuOpts}</select>
                 </div>
             </div>
-            <div style="font-size:12px; color: var(--text-muted); margin-bottom:10px;" id="sku-desc-${contadorOrdens}">Descrição: ---</div>
+            <div style="font-size:12px; color: var(--accent-orange); font-weight:bold; margin-bottom:10px;" id="sku-desc-${contadorOrdens}">Descrição: ---</div>
             <div class="grid-2">
                 <div class="form-group"><label>Horário Padrão (m):</label><input type="number" class="op-hp" value="0" oninput="calcularResumo()"></div>
                 <div class="form-group"><label>Run Time (m):</label><input type="number" class="op-rt" value="0" oninput="calcularResumo()"></div>
@@ -126,8 +144,8 @@ function adicionarOrdem() {
                 <div class="form-group"><label>Classificação TNO:</label><select class="op-tipo-tno">${tnoOpts}</select></div>
                 <div class="form-group"><label>Tempo TNO (m):</label><input type="number" class="op-tempo-tno" value="0" oninput="calcularResumo()"></div>
             </div>
-            <div style="font-size:12px; color: var(--success-color); font-weight:bold; margin-top:5px;" id="ordem-calc-${contadorOrdens}">Estoque Calculado: 0 peças | Mov: 0% | Loss: 0%</div>
-            <button class="btn-small-delete" style="margin-top:10px;" onclick="removerItem('ordem-${contadorOrdens}')">Remover OP</button>
+            <div style="font-size:13px; color: var(--success-color); font-weight:bold; margin-top:5px; padding-top: 10px; border-top: 1px solid #334155;" id="ordem-calc-${contadorOrdens}">Estoque Calculado: 0 peças | Mov: 0% | Loss: 0%</div>
+            <button class="btn-small-delete" onclick="removerItem('ordem-${contadorOrdens}')">Remover Ordem</button>
         </div>`;
     container.insertAdjacentHTML('beforeend', html);
     atualizarDescricaoSku(contadorOrdens);
@@ -142,7 +160,7 @@ function adicionarParada() {
                 <div class="form-group"><label>Código do Defeito:</label><select class="input-parada-cod select-parada-dinamica"></select></div>
                 <div class="form-group"><label>Minutos:</label><input type="number" class="input-parada-min" value="0" oninput="calcularResumo()"></div>
             </div>
-            <button class="btn-small-delete" style="margin-top:5px;" onclick="removerItem('parada-${contadorParadas}')">Remover Código</button>
+            <button class="btn-small-delete" onclick="removerItem('parada-${contadorParadas}')">Remover Código</button>
         </div>`;
     container.insertAdjacentHTML('beforeend', html);
     atualizarRegrasDeMaquina();
@@ -153,7 +171,7 @@ function removerItem(id) { document.getElementById(id).remove(); calcularResumo(
 function atualizarDescricaoSku(idCard) {
     const skuCod = document.querySelector(`#ordem-${idCard} .op-sku`).value;
     const sku = MESTRE_SKUS.find(s => s.codigo_sku === skuCod);
-    document.getElementById(`sku-desc-${idCard}`).innerText = `Descrição: ${sku ? sku.descricao : '---'}`;
+    document.getElementById(`sku-desc-${idCard}`).innerText = `Descrição: ${sku ? sku.descricao : 'Selecione o produto'}`;
     calcularResumo();
 }
 
@@ -264,11 +282,18 @@ async function enviarApontamento() {
             preencherSeletoresIniciais();
         } else {
             const err = await res.json();
-            alert(`Erro: ${err.detail}`);
+            alert(`Erro ao salvar:\n${err.detail}`);
         }
-    } catch(e) { alert("Erro de rede."); }
-    finally { btn.innerText = "Gravar Apontamento de Turno"; }
+    } catch(e) { alert("Erro de rede ao salvar."); }
+    finally { 
+        btn.innerText = "Gravar Apontamento de Turno"; 
+        calcularResumo(); 
+    }
 }
+
+// ==========================================
+// FUNÇÕES DO PAINEL GERENCIAL (ADMIN)
+// ==========================================
 
 function navegarPara(idAba) {
     document.getElementById('tela-operador').classList.add('escondido');
@@ -295,15 +320,15 @@ async function carregarHistoricoAdmin() {
         const res = await fetch(`${API_URL}/historico-lancamentos`);
         if (res.ok) {
             const logs = await res.json();
-            container.innerHTML = logs.length === 0 ? "<p>Nenhum lançamento encontrado.</p>" : "";
+            container.innerHTML = logs.length === 0 ? "<p style='color:gray;'>Nenhum lançamento no banco.</p>" : "";
             logs.forEach(l => {
                 container.innerHTML += `
                     <div class="item-backoffice">
                         <div>
-                            <strong>Data: ${l.data_registro.split('-').reverse().join('/')} | Turno ${l.turno} | Mq ${l.maquina_numero}</strong><br>
-                            <span style="font-size:11px; color:var(--text-muted);">Apontado por: ${l.operador} | Counter Total: ${parseFloat(l.total_mc).toLocaleString()}</span>
+                            <strong style="color:var(--accent-blue);">Data: ${l.data_registro.split('-').reverse().join('/')} | Turno ${l.turno} | Mq ${l.maquina_numero}</strong><br>
+                            <span style="font-size:12px; color:var(--text-muted);">Apontado por: ${l.operador} | Counter Total: ${parseFloat(l.total_mc).toLocaleString()}</span>
                         </div>
-                        <button class="btn-small-delete" onclick="deletarHistorico(${l.id})">Excluir</button>
+                        <button class="btn-small-delete" style="margin-top:0;" onclick="deletarHistorico(${l.id})">Apagar</button>
                     </div>`;
             });
         }
@@ -311,11 +336,37 @@ async function carregarHistoricoAdmin() {
 }
 
 async function deletarHistorico(id) {
-    if (!confirm("Deletar permanentemente este apontamento do banco de dados?")) return;
+    if (!confirm("Tem certeza que deseja apagar permanentemente este apontamento?")) return;
     try {
         const res = await fetch(`${API_URL}/historico-lancamentos/${id}`, { method: 'DELETE' });
         if (res.ok) { alert("Lançamento excluído!"); carregarHistoricoAdmin(); }
     } catch(e) { alert("Erro ao deletar."); }
+}
+
+async function adicionarSkuMestre() {
+    const codigo_sku = document.getElementById('adm-sku-cod').value.trim();
+    const descricao = document.getElementById('adm-sku-desc').value.trim();
+    const fraldas_por_pacote = parseInt(document.getElementById('adm-sku-fraldas').value) || 0;
+    const pacotes_por_fardo = parseInt(document.getElementById('adm-sku-pacotes').value) || 0;
+    const fardos_por_pallet = parseInt(document.getElementById('adm-sku-fardos').value) || 0;
+
+    if (!codigo_sku || !descricao) return alert("Preencha Código e Descrição do SKU.");
+
+    try {
+        const res = await fetch(`${API_URL}/admin/skus`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ codigo_sku, descricao, fraldas_por_pacote, pacotes_por_fardo, fardos_por_pallet })
+        });
+        if(res.ok) { 
+            alert("SKU cadastrado com sucesso!"); 
+            document.getElementById('adm-sku-cod').value = '';
+            document.getElementById('adm-sku-desc').value = '';
+            await baixarDadosMestres(); 
+            preencherSeletoresIniciais(); 
+        } else {
+            const err = await res.json(); alert("Erro: " + err.detail);
+        }
+    } catch(e) { alert("Erro de conexão."); }
 }
 
 async function adicionarMaquinaMestre() {
@@ -323,32 +374,63 @@ async function adicionarMaquinaMestre() {
     const tipo = document.getElementById('adm-m-tipo').value;
     if(!numero_maquina) return alert("Insira o número.");
 
-    const res = await fetch(`${API_URL}/admin/maquinas`, {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ numero_maquina, tipo })
-    });
-    if(res.ok) { alert("Máquina adicionada!"); baixarDadosMestres(); preencherSeletoresIniciais(); }
+    try {
+        const res = await fetch(`${API_URL}/admin/maquinas`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ numero_maquina, tipo })
+        });
+        if(res.ok) { 
+            alert("Máquina salva com sucesso!"); 
+            document.getElementById('adm-m-numero').value = '';
+            await baixarDadosMestres(); 
+            preencherSeletoresIniciais(); 
+        } else {
+            const err = await res.json(); alert("Erro: " + err.detail);
+        }
+    } catch(e) { alert("Erro de conexão."); }
 }
 
 async function adicionarParadaMestre() {
     const tipo_maquina = document.getElementById('adm-p-tipo').value;
     const numero = document.getElementById('adm-p-numero').value.trim();
     const problema = document.getElementById('adm-p-problema').value.trim();
+    if(!numero || !problema) return alert("Preencha Nº do Código e o Problema.");
 
-    const res = await fetch(`${API_URL}/admin/paradas`, {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ tipo_maquina, numero, problema })
-    });
-    if(res.ok) { alert("Código mestre de parada salvo!"); baixarDadosMestres(); atualizarRegrasDeMaquina(); }
+    try {
+        const res = await fetch(`${API_URL}/admin/paradas`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ tipo_maquina, numero, problema })
+        });
+        if(res.ok) { 
+            alert("Código mestre de parada salvo!"); 
+            document.getElementById('adm-p-numero').value = '';
+            document.getElementById('adm-p-problema').value = '';
+            await baixarDadosMestres(); 
+            atualizarRegrasDeMaquina(); 
+        } else {
+            const err = await res.json(); alert("Erro: " + err.detail);
+        }
+    } catch(e) { alert("Erro de conexão."); }
 }
 
 async function adicionarTnoMestre() {
     const nome = document.getElementById('adm-tno-nome').value.trim();
-    const res = await fetch(`${API_URL}/admin/tnos`, {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ nome })
-    });
-    if(res.ok) { alert("Nova estratificação de TNO cadastrada!"); baixarDadosMestres(); preencherSeletoresIniciais(); }
+    if(!nome) return alert("Digite o nome da classificação.");
+
+    try {
+        const res = await fetch(`${API_URL}/admin/tnos`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ nome })
+        });
+        if(res.ok) { 
+            alert("Nova estratificação de TNO cadastrada!"); 
+            document.getElementById('adm-tno-nome').value = '';
+            await baixarDadosMestres(); 
+            preencherSeletoresIniciais(); 
+        } else {
+            const err = await res.json(); alert("Erro: " + err.detail);
+        }
+    } catch(e) { alert("Erro de conexão."); }
 }
 
 async function adicionarUsuarioMestre() {
@@ -356,10 +438,20 @@ async function adicionarUsuarioMestre() {
     const login = document.getElementById('adm-u-login').value.trim().toLowerCase();
     const senha = document.getElementById('adm-u-senha').value;
     const nivel = parseInt(document.getElementById('adm-u-nivel').value);
+    if(!nome || !login || !senha) return alert("Preencha todos os campos do usuário.");
 
-    const res = await fetch(`${API_URL}/admin/usuarios`, {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ login, senha, nome, nivel })
-    });
-    if(res.ok) alert("Novo colaborador adicionado ao banco de dados!");
+    try {
+        const res = await fetch(`${API_URL}/admin/usuarios`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ login, senha, nome, nivel })
+        });
+        if(res.ok) {
+            alert("Novo colaborador adicionado ao banco de dados!");
+            document.getElementById('adm-u-nome').value = '';
+            document.getElementById('adm-u-login').value = '';
+            document.getElementById('adm-u-senha').value = '';
+        } else {
+            const err = await res.json(); alert("Erro: " + err.detail);
+        }
+    } catch(e) { alert("Erro de conexão."); }
 }
