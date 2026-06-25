@@ -1,5 +1,5 @@
 // URL do seu Render
-const API_URL = "https://newisland-ho6j.onrender.com";
+const API_URL = "https://newisland-zzhk.onrender.com";
 
 let usuarioLogado = null;
 let DADOS_SKUS = [];
