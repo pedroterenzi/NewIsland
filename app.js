@@ -49,7 +49,11 @@ function sair() {
 async function inicializarPainel() {
     document.getElementById('tela-login').classList.add('escondido');
     document.getElementById('menu-navegacao').classList.remove('escondido');
-    document.getElementById('txt-user').innerText = `Operador: ${usuarioLogado.nome}`;
+    
+    // CORREÇÃO 1: Exibe a tela do operador IMEDIATAMENTE para não ficar preta
+    navegarPara('operador');
+    
+    document.getElementById('txt-user').innerText = `Colaborador: ${usuarioLogado.nome}`;
 
     if (parseInt(usuarioLogado.nivel) >= 2) {
         document.querySelectorAll('.restrito-lider-adm').forEach(el => el.classList.remove('escondido'));
@@ -60,9 +64,9 @@ async function inicializarPainel() {
     const inputData = document.getElementById('ap-data');
     if (inputData) inputData.value = new Date().toISOString().split('T')[0];
 
+    // Carrega os dados em segundo plano
     await baixarDadosMestres();
     preencherSeletoresIniciais();
-    navegarPara('operador');
 }
 
 async function baixarDadosMestres() {
@@ -75,7 +79,7 @@ async function baixarDadosMestres() {
             MESTRE_TNOS = data.tnos || [];
             MESTRE_MAQUINAS = data.maquinas || [];
         } else {
-            alert("Erro ao carregar dados do banco.");
+            console.error("Erro ao carregar dados do banco.");
         }
     } catch (e) { console.error("Erro dados mestres", e); }
 }
@@ -122,8 +126,9 @@ function adicionarOrdem() {
     let tnoOpts = '<option value="">Nenhum (0 min)</option>';
     tnoOpts += MESTRE_TNOS.map(t => `<option value="${t.nome}">${t.nome}</option>`).join('');
 
+    // CORREÇÃO 2: Adicionada a classe 'card-ordem' para evitar o erro de JavaScript
     const html = `
-        <div class="dynamic-item" id="ordem-${contadorOrdens}">
+        <div class="dynamic-item card-ordem" id="ordem-${contadorOrdens}">
             <div class="grid-2">
                 <div class="form-group"><label>Nº Ordem (OP):</label><input type="text" class="op-numero"></div>
                 <div class="form-group">
@@ -156,7 +161,7 @@ function adicionarParada() {
     contadorParadas++;
     const container = document.getElementById('container-paradas');
     const html = `
-        <div class="dynamic-item" id="parada-${contadorParadas}">
+        <div class="dynamic-item card-parada" id="parada-${contadorParadas}">
             <div class="grid-2">
                 <div class="form-group"><label>Código do Defeito:</label><select class="input-parada-cod select-parada-dinamica"></select></div>
                 <div class="form-group"><label>Minutos:</label><input type="number" class="input-parada-min" value="0" oninput="calcularResumo()"></div>
@@ -177,14 +182,15 @@ function atualizarDescricaoSku(idCard) {
 }
 
 function calcularResumo() {
-    const turno = parseInt(document.getElementById('ap-turno').value);
+    const turno = parseInt(document.getElementById('ap-turno').value || 1);
     const temposTurno = {1: 455, 2: 440, 3: 415};
     const cargaExigida = temposTurno[turno] || 440;
 
     let totalMC = 0, totalPecasEstoque = 0, totalHP = 0, totalRT = 0, totalTNO = 0, totalParadas = 0;
 
-    document.querySelectorAll("[id^='ordem-']").forEach(div => {
-        const idCard = div.id.split('-')[1];
+    // Busca apenas os cards REAIS de ordem, evitando o erro de Javascript
+    document.querySelectorAll(".card-ordem").forEach(div => {
+        const idCard = div.id.replace('ordem-', '');
         const skuCod = div.querySelector('.op-sku').value;
         const hp = parseInt(div.querySelector('.op-hp').value || 0);
         const rt = parseInt(div.querySelector('.op-rt').value || 0);
@@ -251,7 +257,7 @@ async function enviarApontamento() {
         paradas: []
     };
 
-    document.querySelectorAll("[id^='ordem-']").forEach(div => {
+    document.querySelectorAll(".card-ordem").forEach(div => {
         payload.ordens.push({
             ordem: div.querySelector('.op-numero').value,
             codigo_sku: div.querySelector('.op-sku').value,
@@ -265,7 +271,7 @@ async function enviarApontamento() {
         });
     });
 
-    document.querySelectorAll("[id^='parada-']").forEach(div => {
+    document.querySelectorAll(".card-parada").forEach(div => {
         payload.paradas.push({
             numero_parada: div.querySelector('.input-parada-cod').value,
             minutos_parados: parseInt(div.querySelector('.input-parada-min').value || 0)
@@ -366,7 +372,7 @@ async function adicionarSkuMestre() {
         } else {
             const err = await res.json(); alert("Erro: " + err.detail);
         }
-    } catch(e) { alert("Erro de conexão."); }
+    } catch(e) { console.error(e); alert("Erro ao conectar com o banco de dados."); }
 }
 
 async function adicionarMaquinaMestre() {
@@ -387,7 +393,7 @@ async function adicionarMaquinaMestre() {
         } else {
             const err = await res.json(); alert("Erro: " + err.detail);
         }
-    } catch(e) { alert("Erro de conexão."); }
+    } catch(e) { console.error(e); alert("Erro ao conectar com o banco de dados."); }
 }
 
 async function adicionarParadaMestre() {
@@ -410,7 +416,7 @@ async function adicionarParadaMestre() {
         } else {
             const err = await res.json(); alert("Erro: " + err.detail);
         }
-    } catch(e) { alert("Erro de conexão."); }
+    } catch(e) { console.error(e); alert("Erro ao conectar com o banco de dados."); }
 }
 
 async function adicionarTnoMestre() {
@@ -430,7 +436,7 @@ async function adicionarTnoMestre() {
         } else {
             const err = await res.json(); alert("Erro: " + err.detail);
         }
-    } catch(e) { alert("Erro de conexão."); }
+    } catch(e) { console.error(e); alert("Erro ao conectar com o banco de dados."); }
 }
 
 async function adicionarUsuarioMestre() {
@@ -453,5 +459,5 @@ async function adicionarUsuarioMestre() {
         } else {
             const err = await res.json(); alert("Erro: " + err.detail);
         }
-    } catch(e) { alert("Erro de conexão."); }
+    } catch(e) { console.error(e); alert("Erro ao conectar com o banco de dados."); }
 }
