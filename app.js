@@ -31,7 +31,7 @@ async function executarLogin() {
             alert("Credenciais incorretas.");
         }
     } catch (e) {
-        alert("Erro de conexão com o servidor. Aguarde uns segundos e tente novamente.");
+        alert("Erro de conexão com o servidor. Tente novamente em alguns segundos.");
     } finally {
         btn.innerText = "Entrar no Sistema"; btn.disabled = false;
     }
@@ -43,12 +43,13 @@ function sair() {
     document.getElementById('tela-admin').classList.add('escondido');
     document.getElementById('menu-navegacao').classList.add('escondido');
     document.getElementById('tela-login').classList.remove('escondido');
+    document.getElementById('login-senha').value = '';
 }
 
 async function inicializarPainel() {
     document.getElementById('tela-login').classList.add('escondido');
     document.getElementById('menu-navegacao').classList.remove('escondido');
-    document.getElementById('txt-user').innerText = `Colaborador: ${usuarioLogado.nome}`;
+    document.getElementById('txt-user').innerText = `Operador: ${usuarioLogado.nome}`;
 
     if (parseInt(usuarioLogado.nivel) >= 2) {
         document.querySelectorAll('.restrito-lider-adm').forEach(el => el.classList.remove('escondido'));
@@ -74,7 +75,7 @@ async function baixarDadosMestres() {
             MESTRE_TNOS = data.tnos || [];
             MESTRE_MAQUINAS = data.maquinas || [];
         } else {
-            alert("Erro ao sincronizar banco de dados.");
+            alert("Erro ao carregar dados do banco.");
         }
     } catch (e) { console.error("Erro dados mestres", e); }
 }
@@ -82,9 +83,9 @@ async function baixarDadosMestres() {
 function preencherSeletoresIniciais() {
     const selMq = document.getElementById('ap-maquina');
     if (MESTRE_MAQUINAS.length > 0) {
-        selMq.innerHTML = MESTRE_MAQUINAS.map(m => `<option value="${m.numero_maquina}">Máquina ${m.numero_maquina} (${m.tipo === 'baby_care' ? 'Baby' : 'Adulto'})</option>`).join('');
+        selMq.innerHTML = MESTRE_MAQUINAS.map(m => `<option value="${m.numero_maquina}">Máquina ${m.numero_maquina}</option>`).join('');
     } else {
-        selMq.innerHTML = '<option value="">Sem máquinas cadastradas</option>';
+        selMq.innerHTML = '<option value="">Sem máquinas</option>';
     }
     
     document.getElementById('container-ordens').innerHTML = '';
@@ -118,7 +119,7 @@ function adicionarOrdem() {
     let skuOpts = '<option value="">Selecione o SKU</option>';
     skuOpts += MESTRE_SKUS.map(s => `<option value="${s.codigo_sku}">${s.codigo_sku}</option>`).join('');
     
-    let tnoOpts = '<option value="">Nenhum</option>';
+    let tnoOpts = '<option value="">Nenhum (0 min)</option>';
     tnoOpts += MESTRE_TNOS.map(t => `<option value="${t.nome}">${t.nome}</option>`).join('');
 
     const html = `
@@ -144,7 +145,7 @@ function adicionarOrdem() {
                 <div class="form-group"><label>Classificação TNO:</label><select class="op-tipo-tno">${tnoOpts}</select></div>
                 <div class="form-group"><label>Tempo TNO (m):</label><input type="number" class="op-tempo-tno" value="0" oninput="calcularResumo()"></div>
             </div>
-            <div style="font-size:13px; color: var(--success-color); font-weight:bold; margin-top:5px; padding-top: 10px; border-top: 1px solid #334155;" id="ordem-calc-${contadorOrdens}">Estoque Calculado: 0 peças | Mov: 0% | Loss: 0%</div>
+            <div style="font-size:13px; color: var(--success-color); font-weight:bold; margin-top:5px; padding-top: 10px; border-top: 1px solid #334155;" id="ordem-calc-${contadorOrdens}">Estoque: 0 peças | Mov: 0% | Loss: 0%</div>
             <button class="btn-small-delete" onclick="removerItem('ordem-${contadorOrdens}')">Remover Ordem</button>
         </div>`;
     container.insertAdjacentHTML('beforeend', html);
@@ -160,7 +161,7 @@ function adicionarParada() {
                 <div class="form-group"><label>Código do Defeito:</label><select class="input-parada-cod select-parada-dinamica"></select></div>
                 <div class="form-group"><label>Minutos:</label><input type="number" class="input-parada-min" value="0" oninput="calcularResumo()"></div>
             </div>
-            <button class="btn-small-delete" onclick="removerItem('parada-${contadorParadas}')">Remover Código</button>
+            <button class="btn-small-delete" style="margin-top:5px;" onclick="removerItem('parada-${contadorParadas}')">Remover Parada</button>
         </div>`;
     container.insertAdjacentHTML('beforeend', html);
     atualizarRegrasDeMaquina();
@@ -202,7 +203,7 @@ function calcularResumo() {
         let movOrdem = hp > 0 ? ((rt / hp) * 100).toFixed(1) : 0;
         let lossOrdem = mc > 0 ? (((mc - pecasOrdem) / mc) * 100).toFixed(1) : 0;
 
-        document.getElementById(`ordem-calc-${idCard}`).innerText = `Estoque Calculado: ${pecasOrdem.toLocaleString()} peças | Mov: ${movOrdem}% | Loss: ${lossOrdem}%`;
+        document.getElementById(`ordem-calc-${idCard}`).innerText = `Estoque: ${pecasOrdem.toLocaleString()} peças | Mov: ${movOrdem}% | Loss: ${lossOrdem}%`;
 
         totalMC += mc;
         totalPecasEstoque += pecasOrdem;
@@ -291,10 +292,6 @@ async function enviarApontamento() {
     }
 }
 
-// ==========================================
-// FUNÇÕES DO PAINEL GERENCIAL (ADMIN)
-// ==========================================
-
 function navegarPara(idAba) {
     document.getElementById('tela-operador').classList.add('escondido');
     document.getElementById('tela-admin').classList.add('escondido');
@@ -361,6 +358,9 @@ async function adicionarSkuMestre() {
             alert("SKU cadastrado com sucesso!"); 
             document.getElementById('adm-sku-cod').value = '';
             document.getElementById('adm-sku-desc').value = '';
+            document.getElementById('adm-sku-fraldas').value = '0';
+            document.getElementById('adm-sku-pacotes').value = '0';
+            document.getElementById('adm-sku-fardos').value = '0';
             await baixarDadosMestres(); 
             preencherSeletoresIniciais(); 
         } else {
