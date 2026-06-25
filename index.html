@@ -19,16 +19,13 @@
         }
         * { box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; }
         body { background-color: var(--bg-color); color: var(--text-color); margin: 0; display: flex; justify-content: center; padding-bottom: 120px; overflow-x: hidden; }
-        .app-container { width: 100%; max-width: 600px; padding: 16px; margin: 0 auto; overflow-x: hidden; }
+        .app-container { width: 100%; max-width: 650px; padding: 16px; margin: 0 auto; overflow-x: hidden; }
         
         .card { background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%); border: 1px solid var(--border-color); padding: 24px; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 8px 30px rgba(0,0,0,0.5); width: 100%; }
         
         .form-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; width: 100%; }
         .form-group label { font-size: 13px; font-weight: 600; color: var(--text-muted); }
-        .form-group input, .form-group select { 
-            width: 100%; height: 48px; padding: 0 14px; background: #0f172a; border: 1px solid #334155; border-radius: 12px; color: white; font-size: 14px; transition: all 0.3s ease; -webkit-appearance: none; appearance: none;
-        }
-        .form-group select { background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 12px center; background-size: 16px; padding-right: 32px; }
+        .form-group input, .form-group select { width: 100%; height: 48px; padding: 0 14px; background: #0f172a; border: 1px solid #334155; border-radius: 12px; color: white; font-size: 14px; transition: all 0.3s ease; }
         .form-group input:focus, .form-group select:focus { border-color: var(--accent-blue); outline: none; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
         
         h2, h3, h4 { color: #ffffff; margin-top: 0; font-weight: 700; letter-spacing: -0.5px; }
@@ -46,17 +43,16 @@
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
         
-        .grid-indicadores { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px; }
-        .kpi-card { background: #0f172a; border: 1px solid #334155; padding: 20px; border-radius: 16px; display: flex; flex-direction: column; align-items: center; text-align: center;}
-        .kpi-card .kpi-label { font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;}
-        .kpi-card .kpi-val { font-size: 22px; font-weight: 800; margin-top: 8px; letter-spacing: -0.5px; }
+        .kpi-card { background: #0f172a; border: 1px solid #334155; padding: 16px; border-radius: 16px; text-align: center;}
+        .kpi-card .kpi-label { font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;}
+        .kpi-card .kpi-val { font-size: 20px; font-weight: 800; margin-top: 6px; letter-spacing: -0.5px; }
         
         .resumo-box { background: rgba(37, 99, 235, 0.05); border: 1px solid rgba(37, 99, 235, 0.2); padding: 16px; border-radius: 14px; margin-bottom: 20px; }
         .resumo-item { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 6px; }
         .status-ok { color: var(--success-color); font-weight: bold; }
         .status-erro { color: var(--danger-color); font-weight: bold; }
         
-        .nav-inferior { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: calc(100% - 20px); max-width: 580px; background: rgba(30, 41, 59, 0.90); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-evenly; align-items: center; padding: 12px 10px; border-radius: 24px; z-index: 1000; box-shadow: 0 10px 40px rgba(0,0,0,0.7); }
+        .nav-inferior { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: calc(100% - 20px); max-width: 580px; background: rgba(30, 41, 59, 0.95); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-evenly; align-items: center; padding: 12px 10px; border-radius: 24px; z-index: 1000; box-shadow: 0 10px 40px rgba(0,0,0,0.7); }
         .nav-item { background: transparent; border: none; color: var(--text-muted); display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; padding: 8px 10px; border-radius: 14px; font-weight: 700; font-size: 11px; }
         .nav-item.ativo { color: #fff; background: var(--accent-blue); }
         
@@ -70,10 +66,11 @@
         
         /* Tabela Premium Estilo Totvs/BI */
         .table-wrapper { width: 100%; overflow-x: auto; border-radius: 12px; border: 1px solid var(--border-color); background: #0f172a; box-shadow: inset 0 4px 6px rgba(0,0,0,0.1);}
-        .table-premium { width: 100%; border-collapse: separate; border-spacing: 0; text-align: left; font-size: 13px; white-space: nowrap; }
-        .table-premium th { background: #1e293b; color: var(--accent-orange); padding: 16px; font-weight: 700; border-bottom: 2px solid var(--border-color); text-transform: uppercase; letter-spacing: 0.5px; position: sticky; top: 0; z-index: 2;}
-        .table-premium td { padding: 16px; border-bottom: 1px solid #1e293b; color: var(--text-color); transition: background 0.2s;}
-        .table-premium tr:hover td { background: rgba(37, 99, 235, 0.1); }
+        .table-premium { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; white-space: nowrap; }
+        .table-premium th { background: #1e293b; color: var(--accent-orange); padding: 14px 16px; font-weight: 700; border-bottom: 2px solid #334155; text-transform: uppercase; letter-spacing: 0.5px;}
+        .table-premium td { padding: 14px 16px; border-bottom: 1px solid #1e293b; color: var(--text-color); transition: background 0.2s;}
+        .table-premium tr:nth-child(even) td { background: rgba(255, 255, 255, 0.02); }
+        .table-premium tr:hover td { background: rgba(37, 99, 235, 0.1); cursor: default; }
         .table-premium tr:last-child td { border-bottom: none; }
         .badge-success { background: rgba(16, 185, 129, 0.1); color: var(--success-color); padding: 4px 8px; border-radius: 6px; font-weight: 700; }
         .badge-danger { background: rgba(239, 68, 68, 0.1); color: var(--danger-color); padding: 4px 8px; border-radius: 6px; font-weight: 700; }
@@ -121,7 +118,7 @@
 
         <div class="card">
             <h3>4. Validação & Resumo do Turno</h3>
-            <div class="grid-indicadores">
+            <div class="grid-2">
                 <div class="kpi-card"><div class="kpi-label">Counter Turno</div><div class="kpi-val" id="card-mc">0</div></div>
                 <div class="kpi-card"><div class="kpi-label">Peças Estoque</div><div class="kpi-val" id="card-pecas" style="color: var(--success-color);">0</div></div>
                 <div class="kpi-card"><div class="kpi-label">Movimentação</div><div class="kpi-val" id="card-mov">0%</div></div>
@@ -130,7 +127,7 @@
                 <div class="kpi-card"><div class="kpi-label">Total Paradas</div><div class="kpi-val" id="card-paradas">0m</div></div>
             </div>
 
-            <div class="resumo-box">
+            <div class="resumo-box" style="margin-top: 15px;">
                 <div class="resumo-item"><span>Carga Padrão Turno:</span> <span id="res-carga">455m</span></div>
                 <div class="resumo-item"><span>HP Total + TNO Lançado:</span> <span id="res-total" class="status-erro">0m</span></div>
                 <div style="border-top: 1px dashed var(--border-color); margin: 8px 0;"></div>
@@ -151,7 +148,7 @@
                 <div class="form-group"><label>Turno:</label><select id="filtro-turno" onchange="filtrarLancamentos()"><option value="">Todos</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></div>
             </div>
             <div class="grid-2">
-                <div class="form-group"><label>Máquina:</label><input type="number" id="filtro-maq" placeholder="Nº Máquina" oninput="filtrarLancamentos()"></div>
+                <div class="form-group"><label>Máquina:</label><input type="number" id="filtro-maq" placeholder="Nº" oninput="filtrarLancamentos()"></div>
                 <div class="form-group"><label>OP:</label><input type="text" id="filtro-op" placeholder="Nº Ordem" oninput="filtrarLancamentos()"></div>
             </div>
         </div>
