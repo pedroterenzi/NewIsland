@@ -9,68 +9,56 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-color: #09090b;
-            --card-bg: #131418;
-            --card-hover: #1c1d22;
-            --accent-blue: #2563eb; 
-            --accent-blue-hover: #1d4ed8;
+            --bg-color: #0b1329; /* Azul Escuro Industrial */
+            --card-bg: #131a35;
+            --card-hover: #1c2541;
+            --accent-blue: #3b82f6; 
             --accent-orange: #f97316; 
             --accent-orange-hover: #ea580c;
-            --text-color: #f4f4f5;
-            --text-muted: #a1a1aa;
-            --border-color: #27272a;
+            --text-color: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: #334155;
             --success-color: #10b981;
             --danger-color: #ef4444;
         }
-
         * { box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; }
         body { background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 0; display: flex; justify-content: center; padding-bottom: 120px; letter-spacing: -0.3px; overflow-x: hidden; }
         .app-container { width: 100%; max-width: 500px; padding: 16px; margin: 0 auto; overflow-x: hidden; }
-        
-        .card { background: linear-gradient(145deg, #16171a 0%, #111215 100%); border: 1px solid var(--border-color); padding: 24px; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 8px 30px rgba(0,0,0,0.4); width: 100%; }
-        
+        .card { background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%); border: 1px solid var(--border-color); padding: 24px; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 8px 30px rgba(0,0,0,0.5); width: 100%; }
         .form-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; width: 100%; }
         .form-group label { font-size: 13px; font-weight: 600; color: var(--text-muted); }
         .form-group input, .form-group select { 
-            width: 100%; height: 48px; padding: 0 14px; background: #18191c; border: 1px solid #33353b; border-radius: 12px; color: white; font-size: 14px; transition: all 0.3s ease; -webkit-appearance: none; appearance: none; box-sizing: border-box;
+            width: 100%; height: 48px; padding: 0 14px; background: #0f172a; border: 1px solid #334155; border-radius: 12px; color: white; font-size: 14px; transition: all 0.3s ease; -webkit-appearance: none; appearance: none; box-sizing: border-box;
         }
-        .form-group select { background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 12px center; background-size: 16px; padding-right: 32px; }
-        .form-group input:focus, .form-group select:focus { border-color: var(--accent-blue); outline: none; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15); }
-        
+        .form-group select { background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 12px center; background-size: 16px; padding-right: 32px; }
+        .form-group input:focus, .form-group select:focus { border-color: var(--accent-blue); outline: none; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
         h2, h3, h4 { color: #ffffff; margin-top: 0; font-weight: 700; letter-spacing: -0.5px; }
         h2 { font-size: 24px; text-align: center; }
-        h3 { font-size: 18px; margin-bottom: 16px; color: var(--accent-blue); }
-        
+        h3 { font-size: 18px; margin-bottom: 16px; color: var(--accent-orange); border-bottom: 1px solid var(--border-color); padding-bottom: 6px; }
         .btn-blue { width: 100%; background: var(--accent-blue); color: #fff; border: none; padding: 16px; border-radius: 14px; font-size: 15px; font-weight: 800; cursor: pointer; transition: all 0.2s ease; }
-        .btn-blue:hover { background: var(--accent-blue-hover); transform: translateY(-2px); box-shadow: 0 5px 15px rgba(37, 99, 235, 0.3); }
-        
         .btn-orange { width: 100%; background: var(--accent-orange); color: #fff; border: none; padding: 16px; border-radius: 14px; font-size: 15px; font-weight: 800; cursor: pointer; transition: all 0.2s ease; }
-        .btn-orange:hover { background: var(--accent-orange-hover); transform: translateY(-2px); box-shadow: 0 5px 15px rgba(249, 115, 22, 0.3); }
-        .btn-orange:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
-        
-        .btn-dash { width: 100%; background: transparent; color: var(--accent-orange); border: 1px dashed var(--accent-orange); padding: 14px; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer; margin-bottom: 16px; }
-        
-        .dynamic-item { background: #18191c; border: 1px solid #2a2c32; padding: 18px; border-radius: 16px; margin-bottom: 15px; }
+        .btn-orange:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-dash { width: 100%; background: transparent; color: var(--accent-blue); border: 1px dashed var(--accent-blue); padding: 14px; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer; margin-bottom: 16px; }
+        .dynamic-item { background: #0f172a; border: 1px solid #334155; padding: 18px; border-radius: 16px; margin-bottom: 15px; }
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
-        
         .grid-indicadores { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px; }
-        .kpi-card { background: #18191c; border: 1px solid #2a2c32; padding: 20px; border-radius: 16px; display: flex; flex-direction: column; align-items: center; text-align: center;}
+        .kpi-card { background: #0f172a; border: 1px solid #334155; padding: 20px; border-radius: 16px; display: flex; flex-direction: column; align-items: center; text-align: center;}
         .kpi-card .kpi-label { font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;}
         .kpi-card .kpi-val { font-size: 22px; font-weight: 800; margin-top: 8px; letter-spacing: -0.5px; }
-        
         .resumo-box { background: rgba(37, 99, 235, 0.05); border: 1px solid rgba(37, 99, 235, 0.2); padding: 16px; border-radius: 14px; margin-bottom: 20px; }
         .resumo-item { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 6px; }
         .status-ok { color: var(--success-color); font-weight: bold; }
         .status-erro { color: var(--danger-color); font-weight: bold; }
-        
-        .nav-inferior { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: calc(100% - 40px); max-width: 460px; background: rgba(18, 19, 23, 0.90); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-evenly; align-items: center; padding: 12px 10px; border-radius: 24px; z-index: 1000; box-shadow: 0 10px 40px rgba(0,0,0,0.7); }
-        .nav-item { background: transparent; border: none; color: #71717a; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; padding: 8px 14px; border-radius: 14px; font-weight: 700; font-size: 12px; }
-        .nav-item.ativo { color: #fff; background: var(--accent-blue); }
-        
+        .nav-inferior { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: calc(100% - 40px); max-width: 460px; background: rgba(30, 41, 59, 0.90); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-evenly; align-items: center; padding: 12px 10px; border-radius: 24px; z-index: 1000; box-shadow: 0 10px 40px rgba(0,0,0,0.7); }
+        .nav-item { background: transparent; border: none; color: var(--text-muted); display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; padding: 8px 14px; border-radius: 14px; font-weight: 700; font-size: 12px; }
+        .nav-item.ativo { color: #fff; background: var(--accent-orange); }
         .escondido { display: none !important; }
-        .item-backoffice { background: #18191c; border: 1px solid #2a2c32; padding: 16px; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .item-backoffice { background: #0f172a; border: 1px solid #334155; padding: 16px; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .btn-small-delete { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); padding: 8px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; margin-top: 10px;}
+        .btn-small-edit { background: rgba(37, 99, 235, 0.15); color: #3b82f6; border: 1px solid rgba(37, 99, 235, 0.3); padding: 8px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; margin-top: 10px;}
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(5px); display: flex; justify-content: center; align-items: center; z-index: 2000; padding: 20px; }
+        .modal-content { background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%); border: 1px solid #334155; border-radius: 20px; padding: 28px; width: 100%; max-width: 420px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 40px rgba(0,0,0,0.6);}
     </style>
 </head>
 <body>
@@ -130,7 +118,7 @@
                 <div class="resumo-item"><span>Paradas Reais Calculadas:</span> <span id="res-parada-calc">0m</span></div>
                 <div class="resumo-item"><span>Paradas Lançadas na Aba:</span> <span id="res-parada-apon" class="status-erro">0m</span></div>
             </div>
-            <button class="btn-orange" id="btn-enviar-apontamento" onclick="enviarApontamento()" disabled>Gravar Apontamento</button>
+            <button class="btn-orange" id="btn-enviar-apontamento" onclick="enviarApontamento()" disabled>Gravar Apontamento de Turno</button>
         </div>
     </div>
 
@@ -139,11 +127,11 @@
         
         <div class="card">
             <h3>Histórico de Lançamentos</h3>
-            <div id="lista-historico" style="max-height: 300px; overflow-y: auto;"></div>
+            <div id="lista-historico" style="max-height: 250px; overflow-y: auto;"></div>
         </div>
 
         <div class="card">
-            <h3>+ Adicionar Produto (SKU)</h3>
+            <h3>+ Adicionar / Editar Produto (SKU)</h3>
             <div class="grid-2">
                 <div class="form-group"><label>Código do SKU:</label><input type="text" id="adm-sku-cod" placeholder="Ex: 8010042"></div>
                 <div class="form-group"><label>Descrição do Produto:</label><input type="text" id="adm-sku-desc" placeholder="Ex: Fralda M1"></div>
@@ -154,20 +142,24 @@
                 <div class="form-group"><label>Fardos / Pallet:</label><input type="number" id="adm-sku-fardos" value="0"></div>
             </div>
             <button class="btn-blue" onclick="adicionarSkuMestre()">Salvar Produto</button>
+            <h4 style="margin-top:20px; color:var(--text-muted); font-size:14px;">Catálogo Ativo no Banco:</h4>
+            <div id="lista-skus-cadastrados" style="max-height:200px; overflow-y:auto; margin-top:10px;"></div>
         </div>
 
         <div class="card">
-            <h3>+ Adicionar Nova Máquina</h3>
+            <h3>+ Adicionar / Editar Máquina</h3>
             <div class="form-group"><label>Número da Máquina:</label><input type="number" id="adm-m-numero"></div>
             <div class="form-group">
                 <label>Segmento de Produção:</label>
                 <select id="adm-m-tipo"><option value="baby_care">Baby Care (Mqs 2 a 6)</option><option value="adult_care">Adulto Geriátrico (Mqs 1 e 7)</option></select>
             </div>
             <button class="btn-blue" onclick="adicionarMaquinaMestre()">Salvar Máquina</button>
+            <h4 style="margin-top:20px; color:var(--text-muted); font-size:14px;">Máquinas Ativas:</h4>
+            <div id="lista-maquinas-cadastradas" style="max-height:150px; overflow-y:auto; margin-top:10px;"></div>
         </div>
 
         <div class="card">
-            <h3>+ Adicionar Código de Parada</h3>
+            <h3>+ Adicionar / Editar Código de Parada</h3>
             <div class="form-group">
                 <label>Segmento de Máquina:</label>
                 <select id="adm-p-tipo"><option value="baby_care">Baby Care</option><option value="adult_care">Adulto Care</option></select>
@@ -177,12 +169,16 @@
                 <div class="form-group"><label>Problema:</label><input type="text" id="adm-p-problema"></div>
             </div>
             <button class="btn-blue" onclick="adicionarParadaMestre()">Salvar Código</button>
+            <h4 style="margin-top:20px; color:var(--text-muted); font-size:14px;">Códigos Cadastrados:</h4>
+            <div id="lista-paradas-cadastradas" style="max-height:200px; overflow-y:auto; margin-top:10px;"></div>
         </div>
 
         <div class="card">
             <h3>+ Cadastrar TNO</h3>
             <div class="form-group"><label>Classificação de TNO:</label><input type="text" id="adm-tno-nome"></div>
             <button class="btn-blue" onclick="adicionarTnoMestre()">Salvar TNO</button>
+            <h4 style="margin-top:20px; color:var(--text-muted); font-size:14px;">Classificações Ativas:</h4>
+            <div id="lista-tnos-cadastrados" style="max-height:150px; overflow-y:auto; margin-top:10px;"></div>
         </div>
 
         <div class="card">
@@ -199,15 +195,32 @@
                 </div>
             </div>
             <button class="btn-blue" onclick="adicionarUsuarioMestre()">Salvar Colaborador</button>
+            <h4 style="margin-top:20px; color:var(--text-muted); font-size:14px;">Equipe Cadastrada:</h4>
+            <div id="lista-usuarios-cadastrados" style="max-height:150px; overflow-y:auto; margin-top:10px;"></div>
         </div>
     </div>
 
     <nav class="nav-inferior escondido" id="menu-navegacao">
         <button class="nav-item ativo" id="nav-op" onclick="navegarPara('operador')">📝 Apontar</button>
         <button class="nav-item restrito-lider-adm" id="nav-adm" onclick="navegarPara('admin')">⚙️ Gestão</button>
-        <button class="nav-item" style="color: var(--danger-color);" onclick="sair()">🚪 Sair</button>
     </nav>
 
+</div>
+
+<div id="modal-editar-sku" class="modal-overlay escondido">
+    <div class="modal-content">
+        <h3>Modificar SKU Mestre</h3>
+        <input type="hidden" id="edit-sku-id">
+        <div class="form-group"><label>Código SKU:</label><input type="text" id="edit-sku-cod"></div>
+        <div class="form-group"><label>Descrição:</label><input type="text" id="edit-sku-desc"></div>
+        <div class="grid-3">
+            <div class="form-group"><label>Fraldas/Pct:</label><input type="number" id="edit-sku-fraldas"></div>
+            <div class="form-group"><label>Pct/Fardo:</label><input type="number" id="edit-sku-pacotes"></div>
+            <div class="form-group"><label>Fardos/Pallet:</label><input type="number" id="edit-sku-fardos"></div>
+        </div>
+        <button class="btn-blue" onclick="executarEdicaoSku()">Salvar Alterações</button>
+        <button class="btn-orange" style="background:transparent; color:var(--text-muted); margin-top:6px; border:1px solid var(--border-color);" onclick="fecharModal('modal-editar-sku')">Cancelar</button>
+    </div>
 </div>
 
 <script src="app.js"></script>
