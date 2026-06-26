@@ -102,12 +102,30 @@ function navegarPara(idAba) {
     if(idAba === 'lancamentos') filtrarLancamentos(); 
 }
 
+// CORREÇÃO MESTRA: A função de abrir modal agora reseta os títulos para o padrão
 function abrirModal(id) {
-    document.getElementById(id).classList.remove('escondido');
+    const modal = document.getElementById(id);
+    if(modal) modal.classList.remove('escondido');
+    
+    // Limpa a sujeira dos campos toda vez que a janela abre
     const inputs = document.getElementById(id).querySelectorAll('input');
     inputs.forEach(i => i.type !== 'hidden' ? i.value = '' : null);
+
+    // Reseta o Título para Cadastro (Caso a pessoa abra direto no "+ Adicionar")
+    const titulo = document.getElementById(id + '-titulo');
+    if(titulo) {
+        if(id === 'modal-sku') titulo.innerText = 'Cadastrar Produto';
+        if(id === 'modal-maq') titulo.innerText = 'Cadastrar Máquina';
+        if(id === 'modal-parada') titulo.innerText = 'Código de Parada';
+        if(id === 'modal-tno') titulo.innerText = 'Classificação TNO';
+        if(id === 'modal-usuario') titulo.innerText = 'Novo Usuário';
+    }
 }
-function fecharModal(id) { document.getElementById(id).classList.add('escondido'); }
+
+function fecharModal(id) { 
+    const modal = document.getElementById(id);
+    if(modal) modal.classList.add('escondido'); 
+}
 
 function preencherSeletoresIniciais() {
     const selMq = document.getElementById('ap-maquina');
@@ -158,7 +176,7 @@ function adicionarOrdem() {
             <div class="grid-3">
                 <div class="form-group"><label>Counter (Peças):</label><input type="number" class="op-mc" value="0" oninput="calcularResumo()"></div>
                 <div class="form-group"><label>Pallets:</label><input type="number" class="op-pallets" value="0" oninput="calcularResumo()"></div>
-                <div class="form-group"><label>Fardos Avulsos:</label><input type="number" class="op-fardos" value="0" oninput="calcularResumo()"></div>
+                <div class="form-group"><label>Fardos Av.:</label><input type="number" class="op-fardos" value="0" oninput="calcularResumo()"></div>
             </div>
             
             <div style="background: rgba(0,0,0,0.2); padding: 10px; border-radius: 10px; margin-top: 10px;">
@@ -607,36 +625,52 @@ function renderizarGestao() {
     }
 }
 
+// CORREÇÃO MESTRA: Primeiro abre o modal (que apaga os dados), DEPOIS preenche os dados
 function preencherEdicao(tipo, id) {
     if(tipo === 'sku') {
+        abrirModal('modal-sku');
         const o = MESTRE_SKUS.find(x=>x.id===id);
-        document.getElementById('form-sku-id').value = id; document.getElementById('form-sku-cod').value = o.codigo_sku;
-        document.getElementById('form-sku-desc').value = o.descricao; document.getElementById('form-sku-fra').value = o.fraldas_por_pacote;
-        document.getElementById('form-sku-pac').value = o.pacotes_por_fardo; document.getElementById('form-sku-far').value = o.fardos_por_pallet;
-        document.getElementById('modal-sku-titulo').innerText = "Editar SKU"; abrirModal('modal-sku');
+        document.getElementById('form-sku-id').value = id; 
+        document.getElementById('form-sku-cod').value = o.codigo_sku;
+        document.getElementById('form-sku-desc').value = o.descricao; 
+        document.getElementById('form-sku-fra').value = o.fraldas_por_pacote;
+        document.getElementById('form-sku-pac').value = o.pacotes_por_fardo; 
+        document.getElementById('form-sku-far').value = o.fardos_por_pallet;
+        document.getElementById('modal-sku-titulo').innerText = "Editar SKU"; 
     }
     if(tipo === 'maq') {
+        abrirModal('modal-maq');
         const o = MESTRE_MAQUINAS.find(x=>x.id===id);
-        document.getElementById('form-maq-id').value = id; document.getElementById('form-maq-num').value = o.numero_maquina;
-        document.getElementById('form-maq-tipo').value = o.tipo; document.getElementById('form-maq-ativo').value = o.ativo;
-        document.getElementById('modal-maq-titulo').innerText = "Editar Máquina"; abrirModal('modal-maq');
+        document.getElementById('form-maq-id').value = id; 
+        document.getElementById('form-maq-num').value = o.numero_maquina;
+        document.getElementById('form-maq-tipo').value = o.tipo; 
+        document.getElementById('form-maq-ativo').value = o.ativo;
+        document.getElementById('modal-maq-titulo').innerText = "Editar Máquina"; 
     }
     if(tipo === 'parada') {
+        abrirModal('modal-parada');
         const o = MESTRE_PARADAS.find(x=>x.id===id);
-        document.getElementById('form-parada-id').value = id; document.getElementById('form-parada-tipo').value = o.tipo_maquina;
-        document.getElementById('form-parada-num').value = o.numero; document.getElementById('form-parada-prob').value = o.problema;
-        document.getElementById('modal-parada-titulo').innerText = "Editar Parada"; abrirModal('modal-parada');
+        document.getElementById('form-parada-id').value = id; 
+        document.getElementById('form-parada-tipo').value = o.tipo_maquina;
+        document.getElementById('form-parada-num').value = o.numero; 
+        document.getElementById('form-parada-prob').value = o.problema;
+        document.getElementById('modal-parada-titulo').innerText = "Editar Parada"; 
     }
     if(tipo === 'tno') {
+        abrirModal('modal-tno');
         const o = MESTRE_TNOS.find(x=>x.id===id);
-        document.getElementById('form-tno-id').value = id; document.getElementById('form-tno-nome').value = o.nome;
-        document.getElementById('modal-tno-titulo').innerText = "Editar TNO"; abrirModal('modal-tno');
+        document.getElementById('form-tno-id').value = id; 
+        document.getElementById('form-tno-nome').value = o.nome;
+        document.getElementById('modal-tno-titulo').innerText = "Editar TNO"; 
     }
     if(tipo === 'usu') {
+        abrirModal('modal-usuario');
         const o = MESTRE_USUARIOS.find(x=>x.id===id);
-        document.getElementById('form-u-id').value = id; document.getElementById('form-u-nome').value = o.nome;
-        document.getElementById('form-u-login').value = o.login; document.getElementById('form-u-nivel').value = o.nivel;
-        document.getElementById('modal-usuario-titulo').innerText = "Editar Usuário"; abrirModal('modal-usuario');
+        document.getElementById('form-u-id').value = id; 
+        document.getElementById('form-u-nome').value = o.nome;
+        document.getElementById('form-u-login').value = o.login; 
+        document.getElementById('form-u-nivel').value = o.nivel;
+        document.getElementById('modal-usuario-titulo').innerText = "Editar Usuário"; 
     }
 }
 
