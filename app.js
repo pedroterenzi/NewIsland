@@ -4,7 +4,7 @@ let usuarioLogado = null;
 let MESTRE_SKUS = [], MESTRE_PARADAS = [], MESTRE_TNOS = [], MESTRE_MAQUINAS = [], MESTRE_USUARIOS = [];
 let contadorOrdens = 0, contadorParadas = 0, contadorTnos = 0;
 let editandoTurnoId = null;
-let dadosTotvs = {}; // Variável global para armazenar a planilha lida
+let dadosTotvs = {}; // Dicionário que cruza o arquivo do TOTVS
 
 async function executarLogin() {
     const login = document.getElementById('login-usuario').value.trim();
@@ -45,10 +45,14 @@ async function executarLogin() {
 function sair() { location.reload(); }
 
 async function inicializarPainel() {
-    document.getElementById('tela-login').classList.add('escondido');
-    document.getElementById('menu-navegacao').classList.remove('escondido');
+    const telaLogin = document.getElementById('tela-login');
+    const menuNav = document.getElementById('menu-navegacao');
+    if (telaLogin) telaLogin.classList.add('escondido');
+    if (menuNav) menuNav.classList.remove('escondido');
     
-    document.getElementById('txt-user').innerText = `Operador: ${usuarioLogado.nome}`;
+    const txtUser = document.getElementById('txt-user');
+    if (txtUser) txtUser.innerText = `Operador: ${usuarioLogado.nome}`;
+    
     if (parseInt(usuarioLogado.nivel) >= 2) {
         document.querySelectorAll('.restrito-lider-adm').forEach(el => el.classList.remove('escondido'));
     }
@@ -61,29 +65,20 @@ async function inicializarPainel() {
 }
 
 async function baixarDadosMestres() {
-    let tentativas = 0;
-    while (tentativas < 3) {
-        try {
-            const res = await fetch(`${API_URL}/dados-mestres`);
-            if (res.ok) {
-                const data = await res.json();
-                MESTRE_SKUS = data.skus || [];
-                MESTRE_PARADAS = data.paradas || [];
-                MESTRE_TNOS = data.tnos || [];
-                MESTRE_MAQUINAS = data.maquinas || [];
-                MESTRE_USUARIOS = data.usuarios || [];
-                return;
-            }
-        } catch (e) {
-            console.warn("Tentativa de carregar dados falhou. Retentando em segundo plano...");
+    try {
+        const res = await fetch(`${API_URL}/dados-mestres`);
+        if (res.ok) {
+            const data = await res.json();
+            MESTRE_SKUS = data.skus || [];
+            MESTRE_PARADAS = data.paradas || [];
+            MESTRE_TNOS = data.tnos || [];
+            MESTRE_MAQUINAS = data.maquinas || [];
+            MESTRE_USUARIOS = data.usuarios || [];
+            return;
         }
-        tentativas++;
-        await new Promise(r => setTimeout(r, 1500));
-    }
-    console.error("Falha ao sincronizar dados mestres com o servidor.");
+    } catch (e) { console.error("Erro ao sincronizar dados", e); }
 }
 
-// ================= NAVEGAÇÃO =================
 function navegarPara(idAba) {
     document.querySelectorAll('.aba-conteudo').forEach(el => el.classList.add('escondido'));
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('ativo'));
@@ -100,19 +95,27 @@ function navegarPara(idAba) {
 }
 
 function abrirModal(id) {
-    document.getElementById(id).classList.remove('escondido');
+    const modal = document.getElementById(id);
+    if(modal) modal.classList.remove('escondido');
+    
     const inputs = document.getElementById(id).querySelectorAll('input');
     inputs.forEach(i => i.type !== 'hidden' ? i.value = '' : null);
 }
-function fecharModal(id) { document.getElementById(id).classList.add('escondido'); }
 
-// ================= TELA APONTAMENTO =================
+function fecharModal(id) { 
+    const modal = document.getElementById(id);
+    if(modal) modal.classList.add('escondido'); 
+}
+
 function preencherSeletoresIniciais() {
     const selMq = document.getElementById('ap-maquina');
-    if (MESTRE_MAQUINAS.length > 0) {
-        selMq.innerHTML = MESTRE_MAQUINAS.filter(m => m.ativo).map(m => `<option value="${m.numero_maquina}">Máquina ${m.numero_maquina} (${m.tipo==='baby_care'?'Baby':'Adulto'})</option>`).join('');
+    if(!selMq) return;
+    
+    const maqAtivas = MESTRE_MAQUINAS.filter(m => m.ativo);
+    if (maqAtivas.length > 0) {
+        selMq.innerHTML = maqAtivas.map(m => `<option value="${m.numero_maquina}">Máquina ${m.numero_maquina} (${m.tipo==='baby_care'?'Baby':'Adulto'})</option>`).join('');
     } else {
-        selMq.innerHTML = '<option value="">Sem máquinas</option>';
+        selMq.innerHTML = '<option value="">Sem máquinas cadastradas</option>';
     }
     
     document.getElementById('container-ordens').innerHTML = '';
@@ -135,6 +138,8 @@ function atualizarRegrasDeMaquina() {
 function adicionarOrdem() {
     contadorOrdens++;
     const container = document.getElementById('container-ordens');
+    if(!container) return;
+
     let skuOpts = '<option value="">Selecione o SKU</option>' + MESTRE_SKUS.map(s => `<option value="${s.codigo_sku}">${s.codigo_sku}</option>`).join('');
     
     const html = `
@@ -170,6 +175,8 @@ function adicionarOrdem() {
 function adicionarTnoOrdem(idOrdem) {
     contadorTnos++;
     const container = document.getElementById(`container-tnos-ordem-${idOrdem}`);
+    if(!container) return;
+
     let tnoOpts = '<option value="">Selecione</option>' + MESTRE_TNOS.map(t => `<option value="${t.nome}">${t.nome}</option>`).join('');
     const html = `
         <div class="dynamic-sub-item card-tno" id="tno-${contadorTnos}">
@@ -185,6 +192,8 @@ function adicionarTnoOrdem(idOrdem) {
 function adicionarParada() {
     contadorParadas++;
     const container = document.getElementById('container-paradas');
+    if(!container) return;
+
     const html = `
         <div class="dynamic-item card-parada" id="parada-${contadorParadas}">
             <div class="grid-2">
@@ -199,8 +208,10 @@ function adicionarParada() {
 
 function buscarDescricaoParada(inputEl, idCard) {
     const num = inputEl.value.trim();
-    const mqNumero = document.getElementById('ap-maquina').value;
-    const mqInfo = MESTRE_MAQUINAS.find(m => String(m.numero_maquina) === String(mqNumero));
+    const selMq = document.getElementById('ap-maquina');
+    if(!selMq) return;
+
+    const mqInfo = MESTRE_MAQUINAS.find(m => String(m.numero_maquina) === String(selMq.value));
     const tipo = mqInfo ? mqInfo.tipo : 'baby_care';
     const parada = MESTRE_PARADAS.find(p => p.tipo_maquina === tipo && String(p.numero) === String(num));
     
@@ -211,17 +222,25 @@ function buscarDescricaoParada(inputEl, idCard) {
     }
 }
 
-function removerItem(id) { document.getElementById(id).remove(); calcularResumo(); }
+function removerItem(id) { 
+    const el = document.getElementById(id);
+    if(el) el.remove(); 
+    calcularResumo(); 
+}
 
 function atualizarDescricaoSku(idCard) {
-    const skuCod = document.querySelector(`#ordem-${idCard} .op-sku`).value;
-    const sku = MESTRE_SKUS.find(s => s.codigo_sku === skuCod);
-    document.getElementById(`sku-desc-${idCard}`).innerText = `Descrição: ${sku ? sku.descricao : '---'}`;
+    const select = document.querySelector(`#ordem-${idCard} .op-sku`);
+    if(!select) return;
+
+    const sku = MESTRE_SKUS.find(s => s.codigo_sku === select.value);
+    const descEl = document.getElementById(`sku-desc-${idCard}`);
+    if(descEl) descEl.innerText = `Descrição: ${sku ? sku.descricao : '---'}`;
     calcularResumo();
 }
 
 function calcularResumo() {
-    const turno = parseInt(document.getElementById('ap-turno').value || 1);
+    const apTurno = document.getElementById('ap-turno');
+    const turno = apTurno ? parseInt(apTurno.value || 1) : 1;
     const carga = {1:455, 2:440, 3:415}[turno] || 440;
 
     let totMC = 0, totPecas = 0, totHP = 0, totRT = 0, totTNO = 0, totParadas = 0;
@@ -253,26 +272,31 @@ function calcularResumo() {
 
     document.querySelectorAll('.input-parada-min').forEach(el => totParadas += parseInt(el.value || 0));
 
-    document.getElementById('card-mc').innerText = totMC.toLocaleString();
-    document.getElementById('card-pecas').innerText = totPecas.toLocaleString();
-    document.getElementById('card-mov').innerText = totHP>0 ? `${((totRT/totHP)*100).toFixed(1)}%` : '0%';
-    document.getElementById('card-loss').innerText = totMC>0 ? `${(((totMC-totPecas)/totMC)*100).toFixed(1)}%` : '0%';
-    document.getElementById('card-tno').innerText = `${totTNO}m`;
-    document.getElementById('card-paradas').innerText = `${totParadas}m`;
+    const setVal = (id, val) => { const el = document.getElementById(id); if(el) el.innerText = val; }
+    
+    setVal('card-mc', totMC.toLocaleString());
+    setVal('card-pecas', totPecas.toLocaleString());
+    setVal('card-mov', totHP>0 ? `${((totRT/totHP)*100).toFixed(1)}%` : '0%');
+    setVal('card-loss', totMC>0 ? `${(((totMC-totPecas)/totMC)*100).toFixed(1)}%` : '0%');
+    setVal('card-tno', `${totTNO}m`);
+    setVal('card-paradas', `${totParadas}m`);
 
-    document.getElementById('res-carga').innerText = `${carga}m`;
+    setVal('res-carga', `${carga}m`);
+    
     const tempoApontado = totHP + totTNO;
+    setVal('res-total', `${tempoApontado}m`);
     const elResTot = document.getElementById('res-total');
-    elResTot.innerText = `${tempoApontado}m`;
-    elResTot.className = tempoApontado === carga ? 'status-ok' : 'status-erro';
+    if(elResTot) elResTot.className = tempoApontado === carga ? 'status-ok' : 'status-erro';
 
     const pCalc = totHP - totRT;
-    document.getElementById('res-parada-calc').innerText = `${pCalc}m`;
+    setVal('res-parada-calc', `${pCalc}m`);
+    setVal('res-parada-apon', `${totParadas}m`);
+    
     const elResPar = document.getElementById('res-parada-apon');
-    elResPar.innerText = `${totParadas}m`;
-    elResPar.className = (pCalc === totParadas && pCalc >= 0) ? 'status-ok' : 'status-erro';
+    if(elResPar) elResPar.className = (pCalc === totParadas && pCalc >= 0) ? 'status-ok' : 'status-erro';
 
-    document.getElementById('btn-enviar-apontamento').disabled = !(tempoApontado === carga && pCalc === totParadas && pCalc >= 0);
+    const btnEnviar = document.getElementById('btn-enviar-apontamento');
+    if(btnEnviar) btnEnviar.disabled = !(tempoApontado === carga && pCalc === totParadas && pCalc >= 0);
 }
 
 async function enviarApontamento() {
@@ -327,21 +351,25 @@ async function enviarApontamento() {
             const err = await res.json(); alert(`Atenção: ${err.detail}`);
         }
     } catch(e) { alert("Erro de rede. Verifique sua conexão."); }
-    finally { btn.innerText = editandoTurnoId ? "Atualizar Turno" : "Gravar Apontamento"; calcularResumo(); }
+    finally { 
+        if(btn) { btn.innerText = editandoTurnoId ? "Atualizar Turno" : "Gravar Apontamento"; }
+        calcularResumo(); 
+    }
 }
 
 function cancelarEdicaoApontamento() {
     editandoTurnoId = null;
-    document.getElementById('titulo-apontamento').innerText = "Apontamento Diário";
-    document.getElementById('btn-enviar-apontamento').innerText = "Gravar Apontamento";
-    document.getElementById('btn-cancelar-edicao').classList.add('escondido');
-    document.getElementById('container-ordens').innerHTML = '';
-    document.getElementById('container-paradas').innerHTML = '';
+    const tit = document.getElementById('titulo-apontamento'); if(tit) tit.innerText = "Apontamento Diário";
+    const btnE = document.getElementById('btn-enviar-apontamento'); if(btnE) btnE.innerText = "Gravar Apontamento";
+    const btnC = document.getElementById('btn-cancelar-edicao'); if(btnC) btnC.classList.add('escondido');
+    
+    const cOrd = document.getElementById('container-ordens'); if(cOrd) cOrd.innerHTML = '';
+    const cPar = document.getElementById('container-paradas'); if(cPar) cPar.innerHTML = '';
+    
     contadorOrdens = 0; contadorParadas = 0;
     adicionarOrdem();
 }
 
-// ================= TELA LANÇAMENTOS (FILTROS) =================
 async function filtrarLancamentos() {
     const data = document.getElementById('filtro-data').value;
     const turno = document.getElementById('filtro-turno').value;
@@ -359,6 +387,8 @@ async function filtrarLancamentos() {
         if (res.ok) {
             const data = await res.json();
             const div = document.getElementById('resultados-lancamentos');
+            if(!div) return;
+            
             div.innerHTML = data.length === 0 ? "<p style='color:var(--text-muted); margin-top:20px; text-align:center;'>Nenhum registro encontrado.</p>" : data.map(l => `
                 <div class="item-list">
                     <div>
@@ -390,9 +420,9 @@ async function carregarParaEdicao(id) {
             editandoTurnoId = turno.id;
             navegarPara('operador');
             
-            document.getElementById('titulo-apontamento').innerText = "Editando Turno (ID: "+id+")";
-            document.getElementById('btn-enviar-apontamento').innerText = "Atualizar Turno";
-            document.getElementById('btn-cancelar-edicao').classList.remove('escondido');
+            const tit = document.getElementById('titulo-apontamento'); if(tit) tit.innerText = "Editando Turno (ID: "+id+")";
+            const btnE = document.getElementById('btn-enviar-apontamento'); if(btnE) btnE.innerText = "Atualizar Turno";
+            const btnC = document.getElementById('btn-cancelar-edicao'); if(btnC) btnC.classList.remove('escondido');
 
             document.getElementById('ap-data').value = turno.data_registro;
             document.getElementById('ap-turno').value = turno.turno;
@@ -405,6 +435,8 @@ async function carregarParaEdicao(id) {
             turno.ordens.forEach(o => {
                 adicionarOrdem();
                 const card = document.getElementById(`ordem-${contadorOrdens}`);
+                if(!card) return;
+                
                 card.querySelector('.op-numero').value = o.ordem;
                 card.querySelector('.op-sku').value = o.codigo_sku;
                 card.querySelector('.op-hp').value = o.horario_padrao;
@@ -426,6 +458,8 @@ async function carregarParaEdicao(id) {
             turno.paradas.forEach(p => {
                 adicionarParada();
                 const card = document.getElementById(`parada-${contadorParadas}`);
+                if(!card) return;
+                
                 card.querySelector('.input-parada-cod').value = p.numero_parada;
                 card.querySelector('.input-parada-min').value = p.minutos_parados;
                 buscarDescricaoParada(card.querySelector('.input-parada-cod'), contadorParadas);
@@ -437,14 +471,14 @@ async function carregarParaEdicao(id) {
             alert(`Falha do servidor ao carregar turno: ${err.detail}`);
         }
     } catch(e) { 
-        alert("O servidor pode estar dormindo ou rejeitou a conexão. Tente novamente em alguns instantes."); 
+        alert("O servidor não pôde concluir o carregamento. Tente novamente."); 
     }
 }
 
-// ================= TELA VISÃO OP E VALIDAÇÃO TOTVS =================
+// LÓGICA DE VALIDAÇÃO DO CSV DO TOTVS
 function processarTotvs() {
     const fileInput = document.getElementById('upload-totvs');
-    if (!fileInput.files.length) return alert("Selecione a planilha do TOTVS primeiro.");
+    if (!fileInput.files.length) return alert("Selecione a planilha do TOTVS (CSV) primeiro.");
     
     const file = fileInput.files[0];
     const reader = new FileReader();
@@ -465,23 +499,32 @@ function processarTotvs() {
         });
         
         if (idxLote === -1 || idxQtde === -1) {
-            return alert("Não foi possível encontrar as colunas 'Lote' e/ou 'Qtde Apontada' na planilha.");
+            return alert("Erro: Não foi possível encontrar as colunas 'Lote' e 'Qtde Apontada' na sua planilha.");
         }
         
         dadosTotvs = {};
         for (let i = 1; i < lines.length; i++) {
             const cols = lines[i].split(',');
             if (cols.length > Math.max(idxLote, idxQtde)) {
-                const lote = cols[idxLote].trim();
-                const qtde = parseFloat(cols[idxQtde]) || 0;
-                if (lote) {
-                    dadosTotvs[lote] = (dadosTotvs[lote] || 0) + qtde;
+                let loteSujo = cols[idxLote].trim();
+                let qtde = parseFloat(cols[idxQtde]) || 0;
+                
+                if (loteSujo) {
+                    // REGRA DE OURO UNICHARM: Tira o 01001 final e arranca os zeros do começo
+                    let loteLimpo = loteSujo;
+                    if(loteSujo.length > 5) {
+                        loteLimpo = parseInt(loteSujo.slice(0, -5), 10).toString();
+                    } else {
+                        loteLimpo = parseInt(loteSujo, 10).toString();
+                    }
+                    
+                    dadosTotvs[loteLimpo] = (dadosTotvs[loteLimpo] || 0) + qtde;
                 }
             }
         }
         
-        alert("Planilha TOTVS processada! Verifique a coluna de Status de Validação.");
-        carregarVisaoOP(); // Recarrega a tabela aplicando a comparação
+        alert("A planilha TOTVS foi carregada na memória com sucesso! Verifique a coluna de Status de Validação.");
+        carregarVisaoOP();
     };
     reader.readAsText(file);
 }
@@ -492,12 +535,13 @@ async function carregarVisaoOP() {
         if(res.ok) {
             const ordens = await res.json();
             const tbody = document.querySelector('#tabela-visao-op tbody');
+            if(!tbody) return;
+            
             tbody.innerHTML = ordens.map(o => {
                 const fardosApp = parseFloat(o.total_fardos_calculado) || 0;
                 let fardosTotvsHTML = `<span style="color:var(--text-muted); font-size: 11px;">Aguardando CSV...</span>`;
                 let statusHTML = `<span class="badge-blue">Pendente</span>`;
                 
-                // Se o usuário importou a planilha, faz a mágica da comparação!
                 if (Object.keys(dadosTotvs).length > 0) {
                     const fardosTotvs = dadosTotvs[o.ordem] || 0;
                     fardosTotvsHTML = `<strong>${fardosTotvs}</strong>`;
@@ -525,27 +569,41 @@ async function carregarVisaoOP() {
     } catch(e) {}
 }
 
-// ================= GESTÃO ADMIN (CRUD) =================
 function renderizarGestao() {
-    document.getElementById('lista-admin-skus').innerHTML = MESTRE_SKUS.map(s => `
-        <div class="item-list"><div><strong>${s.codigo_sku}</strong> - ${s.descricao}</div>
-        <div><button class="btn-small-edit" onclick="preencherEdicao('sku', ${s.id})">Editar</button><button class="btn-small-delete" onclick="deletarMestre('skus', ${s.id})">X</button></div></div>`).join('');
+    const boxSkus = document.getElementById('lista-admin-skus');
+    if(boxSkus) {
+        boxSkus.innerHTML = MESTRE_SKUS.map(s => `
+            <div class="item-list"><div><strong>${s.codigo_sku}</strong> - ${s.descricao}</div>
+            <div><button class="btn-small-edit" onclick="preencherEdicao('sku', ${s.id})">Editar</button><button class="btn-small-delete" onclick="deletarMestre('skus', ${s.id})">X</button></div></div>`).join('');
+    }
     
-    document.getElementById('lista-admin-maquinas').innerHTML = MESTRE_MAQUINAS.map(m => `
-        <div class="item-list"><div><strong>Mák ${m.numero_maquina}</strong> - ${m.tipo} ${!m.ativo ? '<span style="color:var(--danger-color);">(Inativa)</span>' : ''}</div>
-        <div><button class="btn-small-edit" onclick="preencherEdicao('maq', ${m.id})">Editar</button></div></div>`).join('');
+    const boxMqs = document.getElementById('lista-admin-maquinas');
+    if(boxMqs) {
+        boxMqs.innerHTML = MESTRE_MAQUINAS.map(m => `
+            <div class="item-list"><div><strong>Mák ${m.numero_maquina}</strong> - ${m.tipo} ${!m.ativo ? '<span style="color:var(--danger-color);">(Inativa)</span>' : ''}</div>
+            <div><button class="btn-small-edit" onclick="preencherEdicao('maq', ${m.id})">Editar</button></div></div>`).join('');
+    }
 
-    document.getElementById('lista-admin-paradas').innerHTML = MESTRE_PARADAS.map(p => `
-        <div class="item-list"><div><strong>[${p.tipo_maquina === 'baby_care' ? 'Baby' : 'Adulto'}] Cód ${p.numero}</strong> - ${p.problema}</div>
-        <div><button class="btn-small-edit" onclick="preencherEdicao('parada', ${p.id})">Editar</button><button class="btn-small-delete" onclick="deletarMestre('paradas', ${p.id})">X</button></div></div>`).join('');
+    const boxParadas = document.getElementById('lista-admin-paradas');
+    if(boxParadas) {
+        boxParadas.innerHTML = MESTRE_PARADAS.map(p => `
+            <div class="item-list"><div><strong>[${p.tipo_maquina === 'baby_care' ? 'Baby' : 'Adulto'}] Cód ${p.numero}</strong> - ${p.problema}</div>
+            <div><button class="btn-small-edit" onclick="preencherEdicao('parada', ${p.id})">Editar</button><button class="btn-small-delete" onclick="deletarMestre('paradas', ${p.id})">X</button></div></div>`).join('');
+    }
 
-    document.getElementById('lista-admin-tnos').innerHTML = MESTRE_TNOS.map(t => `
-        <div class="item-list"><div>${t.nome}</div>
-        <div><button class="btn-small-edit" onclick="preencherEdicao('tno', ${t.id})">Editar</button><button class="btn-small-delete" onclick="deletarMestre('tnos', ${t.id})">X</button></div></div>`).join('');
+    const boxTnos = document.getElementById('lista-admin-tnos');
+    if(boxTnos) {
+        boxTnos.innerHTML = MESTRE_TNOS.map(t => `
+            <div class="item-list"><div>${t.nome}</div>
+            <div><button class="btn-small-edit" onclick="preencherEdicao('tno', ${t.id})">Editar</button><button class="btn-small-delete" onclick="deletarMestre('tnos', ${t.id})">X</button></div></div>`).join('');
+    }
 
-    document.getElementById('lista-admin-usuarios').innerHTML = MESTRE_USUARIOS.map(u => `
-        <div class="item-list"><div><strong>${u.nome}</strong> (${u.login})</div>
-        <div><button class="btn-small-edit" onclick="preencherEdicao('usu', ${u.id})">Editar</button><button class="btn-small-delete" onclick="deletarMestre('usuarios', ${u.id})">X</button></div></div>`).join('');
+    const boxUsers = document.getElementById('lista-admin-usuarios');
+    if(boxUsers) {
+        boxUsers.innerHTML = MESTRE_USUARIOS.map(u => `
+            <div class="item-list"><div><strong>${u.nome}</strong> (${u.login})</div>
+            <div><button class="btn-small-edit" onclick="preencherEdicao('usu', ${u.id})">Editar</button><button class="btn-small-delete" onclick="deletarMestre('usuarios', ${u.id})">X</button></div></div>`).join('');
+    }
 }
 
 function preencherEdicao(tipo, id) {
