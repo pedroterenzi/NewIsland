@@ -20,6 +20,73 @@ DATABASE_URL = "postgresql://neondb_owner:npg_G9jBAgO0hpXr@ep-broad-sky-ate4cjbm
 def get_db_connection():
     return psycopg2.connect(DATABASE_URL)
 
+def inicializar_banco():
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Criação base (Segura)
+        cursor.execute("CREATE TABLE IF NOT EXISTS usuarios (id SERIAL PRIMARY KEY, login VARCHAR(100) UNIQUE NOT NULL, senha VARCHAR(100) NOT NULL, nome VARCHAR(255) NOT NULL, nivel INT DEFAULT 1);")
+        cursor.execute("CREATE TABLE IF NOT EXISTS maquinas (id SERIAL PRIMARY KEY, numero_maquina INT UNIQUE NOT NULL, tipo VARCHAR(50) NOT NULL, ativo BOOLEAN DEFAULT TRUE);")
+        cursor.execute("CREATE TABLE IF NOT EXISTS tipos_tno (id SERIAL PRIMARY KEY, nome VARCHAR(100) UNIQUE NOT NULL);")
+        cursor.execute("CREATE TABLE IF NOT EXISTS master_sku (id SERIAL PRIMARY KEY, codigo_sku VARCHAR(100) UNIQUE NOT NULL, descricao VARCHAR(255), fraldas_por_pacote INT NOT NULL, pacotes_por_fardo INT NOT NULL, fardos_por_pallet INT NOT NULL);")
+        cursor.execute("CREATE TABLE IF NOT EXISTS codigos_parada (id SERIAL PRIMARY KEY, tipo_maquina VARCHAR(50) NOT NULL, numero VARCHAR(50) NOT NULL, problema VARCHAR(255) NOT NULL, UNIQUE(tipo_maquina, numero));")
+        cursor.execute("CREATE TABLE IF NOT EXISTS registro_turnos (id SERIAL PRIMARY KEY, data_registro DATE NOT NULL, turno INT NOT NULL, operador VARCHAR(255) NOT NULL, maquina_numero INT NOT NULL);")
+        
+        # CRIAÇÃO COM A NOVA COLUNA DE FARDOS
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS result_by_order (
+                id SERIAL PRIMARY KEY, 
+                turno_id INT REFERENCES registro_turnos(id) ON DELETE CASCADE, 
+                ordem VARCHAR(100) NOT NULL, 
+                codigo_sku VARCHAR(100) NOT NULL, 
+                horario_padrao INT NOT NULL, 
+                run_time INT NOT NULL, 
+                machine_counter INT NOT NULL, 
+                pallets INT NOT NULL, 
+                fardos_avulsos INT NOT NULL, 
+                total_fardos INT DEFAULT 0, 
+                total_pecas_estoque INT NOT NULL, 
+                taxa_movimentacao NUMERIC(5,2), 
+                taxa_loss NUMERIC(5,2)
+            );
+        """)
+        cursor.execute("CREATE TABLE IF NOT EXISTS ordem_tno (id SERIAL PRIMARY KEY, ordem_id INT REFERENCES result_by_order(id) ON DELETE CASCADE, tipo_tno VARCHAR(100) NOT NULL, tempo_tno INT NOT NULL);")
+        cursor.execute("CREATE TABLE IF NOT EXISTS stop_machine_item (id SERIAL PRIMARY KEY, turno_id INT REFERENCES registro_turnos(id) ON DELETE CASCADE, numero_parada VARCHAR(50) NOT NULL, minutos_parados INT NOT NULL);")
+        
+        # Garante o admin
+        cursor.execute("SELECT id FROM usuarios WHERE login = 'admin';")
+        if not cursor.fetchone():
+            cursor.execute("INSERT INTO usuarios (login, senha, nome, nivel) VALUES ('admin', 'admin', 'Administrador Global', 3);")
+        conn.commit()
+
+        # SUPER ATUALIZAÇÃO MESTRA:
+        # Se a tabela já existia sem a coluna total_fardos, ele adiciona e recalcula retroativamente!
+        try:
+            cursor.execute("ALTER TABLE result_by_order ADD COLUMN total_fardos INT DEFAULT 0;")
+            conn.commit()
+            
+            # Recalcula OPs antigas para consertar seu histórico
+            cursor.execute("""
+                UPDATE result_by_order ro
+                SET total_fardos = (ro.pallets * COALESCE(s.fardos_por_pallet, 0)) + ro.fardos_avulsos
+                FROM master_sku s
+                WHERE ro.codigo_sku = s.codigo_sku AND ro.total_fardos = 0;
+            """)
+            conn.commit()
+        except Exception:
+            conn.rollback() # A coluna já existe, segue o jogo.
+
+        cursor.close()
+    except Exception as e:
+        print(f"Erro Inicializacao: {e}")
+    finally:
+        if conn:
+            conn.close()
+
+inicializar_banco()
+
 class ModelAuth(BaseModel): login: str; senha: str
 class ModelUsuario(BaseModel): login: str; senha: str; nome: str; nivel: int
 class ModelSKU(BaseModel): codigo_sku: str; descricao: str; fraldas_por_pacote: int; pacotes_por_fardo: int; fardos_por_pallet: int
@@ -94,13 +161,20 @@ def processar_apontamento(dados: PayloadApontamento, cursor, turno_id=None):
         cursor.execute("SELECT fraldas_por_pacote, pacotes_por_fardo, fardos_por_pallet FROM master_sku WHERE codigo_sku = %s;", (o.codigo_sku,))
         sku = cursor.fetchone()
         fraldas, pacotes, fardos_pallet = sku if sku else (0, 0, 0)
+        
+        # AGORA CALCULA E GUARDA O Fardo DE FORMA DEFINITIVA
         total_fardos = (o.pallets * fardos_pallet) + o.fardos_avulsos
         total_pecas = total_fardos * pacotes * fraldas
         taxa_mov = (o.run_time / o.horario_padrao * 100) if o.horario_padrao > 0 else 0
         taxa_loss = ((o.machine_counter - total_pecas) / o.machine_counter * 100) if o.machine_counter > 0 else 0
         
-        cursor.execute("INSERT INTO result_by_order (turno_id, ordem, codigo_sku, horario_padrao, run_time, machine_counter, pallets, fardos_avulsos, total_pecas_estoque, taxa_movimentacao, taxa_loss) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id;", (turno_id, o.ordem, o.codigo_sku, o.horario_padrao, o.run_time, o.machine_counter, o.pallets, o.fardos_avulsos, total_pecas, taxa_mov, taxa_loss))
+        cursor.execute("""
+            INSERT INTO result_by_order 
+            (turno_id, ordem, codigo_sku, horario_padrao, run_time, machine_counter, pallets, fardos_avulsos, total_fardos, total_pecas_estoque, taxa_movimentacao, taxa_loss) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id;
+        """, (turno_id, o.ordem, o.codigo_sku, o.horario_padrao, o.run_time, o.machine_counter, o.pallets, o.fardos_avulsos, total_fardos, total_pecas, taxa_mov, taxa_loss))
         ordem_id = cursor.fetchone()[0]
+        
         for t in o.tnos:
             if t.tipo_tno: cursor.execute("INSERT INTO ordem_tno (ordem_id, tipo_tno, tempo_tno) VALUES (%s, %s, %s);", (ordem_id, t.tipo_tno, t.tempo_tno))
     
@@ -176,7 +250,7 @@ def obter_lancamento_completo(id: int):
         turno = cursor.fetchone()
         if not turno: raise HTTPException(status_code=404, detail="Turno não encontrado")
         
-        cursor.execute("SELECT id, ordem, codigo_sku, horario_padrao, run_time, machine_counter, pallets, fardos_avulsos FROM result_by_order WHERE turno_id = %s;", (id,))
+        cursor.execute("SELECT id, ordem, codigo_sku, horario_padrao, run_time, machine_counter, pallets, fardos_avulsos, total_fardos FROM result_by_order WHERE turno_id = %s;", (id,))
         ordens = cursor.fetchall()
         
         lista_ordens = []
@@ -217,22 +291,18 @@ def visao_ordens():
     try:
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
-        # CORREÇÃO: Uso do LEFT JOIN para garantir que a OP apareça mesmo sem SKU compatível!
+        # SOMA O TOTAL DE FARDOS QUE ESTÁ SALVO DIRETO NA OP!
         cursor.execute("""
             SELECT ro.ordem, MAX(rt.maquina_numero) as maquina, ro.codigo_sku, 
             SUM(ro.machine_counter) as total_mc, SUM(ro.total_pecas_estoque) as pecas_estoque, 
             SUM(ro.horario_padrao) as hp_total, SUM(ro.run_time) as rt_total, 
             SUM(ro.pallets) as pallets, SUM(ro.fardos_avulsos) as fardos_avulsos,
-            MAX(s.fardos_por_pallet) as fat_pallet
+            SUM(ro.total_fardos) as total_fardos_calculado
             FROM result_by_order ro
             JOIN registro_turnos rt ON ro.turno_id = rt.id
-            LEFT JOIN master_sku s ON ro.codigo_sku = s.codigo_sku
             GROUP BY ro.ordem, ro.codigo_sku ORDER BY ro.ordem DESC LIMIT 150;
         """)
         linhas = cursor.fetchall()
-        for l in linhas: 
-            fat = l['fat_pallet'] if l['fat_pallet'] else 0
-            l['total_fardos_calculado'] = (l['pallets'] * fat) + l['fardos_avulsos']
         cursor.close()
         return linhas
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
