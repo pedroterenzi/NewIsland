@@ -20,41 +20,6 @@ DATABASE_URL = "postgresql://neondb_owner:npg_G9jBAgO0hpXr@ep-broad-sky-ate4cjbm
 def get_db_connection():
     return psycopg2.connect(DATABASE_URL)
 
-def inicializar_banco():
-    conn = None
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_name='ordem_tno';")
-        if not cursor.fetchone():
-            cursor.execute("DROP TABLE IF EXISTS ordem_tno, result_by_order, stop_machine_item, registro_turnos, codigos_parada, master_sku, tipos_tno, maquinas, usuarios CASCADE;")
-            conn.commit()
-
-        cursor.execute("CREATE TABLE IF NOT EXISTS usuarios (id SERIAL PRIMARY KEY, login VARCHAR(100) UNIQUE NOT NULL, senha VARCHAR(100) NOT NULL, nome VARCHAR(255) NOT NULL, nivel INT DEFAULT 1);")
-        cursor.execute("CREATE TABLE IF NOT EXISTS maquinas (id SERIAL PRIMARY KEY, numero_maquina INT UNIQUE NOT NULL, tipo VARCHAR(50) NOT NULL, ativo BOOLEAN DEFAULT TRUE);")
-        cursor.execute("CREATE TABLE IF NOT EXISTS tipos_tno (id SERIAL PRIMARY KEY, nome VARCHAR(100) UNIQUE NOT NULL);")
-        cursor.execute("CREATE TABLE IF NOT EXISTS master_sku (id SERIAL PRIMARY KEY, codigo_sku VARCHAR(100) UNIQUE NOT NULL, descricao VARCHAR(255), fraldas_por_pacote INT NOT NULL, pacotes_por_fardo INT NOT NULL, fardos_por_pallet INT NOT NULL);")
-        cursor.execute("CREATE TABLE IF NOT EXISTS codigos_parada (id SERIAL PRIMARY KEY, tipo_maquina VARCHAR(50) NOT NULL, numero VARCHAR(50) NOT NULL, problema VARCHAR(255) NOT NULL, UNIQUE(tipo_maquina, numero));")
-        cursor.execute("CREATE TABLE IF NOT EXISTS registro_turnos (id SERIAL PRIMARY KEY, data_registro DATE NOT NULL, turno INT NOT NULL, operador VARCHAR(255) NOT NULL, maquina_numero INT NOT NULL);")
-        cursor.execute("CREATE TABLE IF NOT EXISTS result_by_order (id SERIAL PRIMARY KEY, turno_id INT REFERENCES registro_turnos(id) ON DELETE CASCADE, ordem VARCHAR(100) NOT NULL, codigo_sku VARCHAR(100) NOT NULL, horario_padrao INT NOT NULL, run_time INT NOT NULL, machine_counter INT NOT NULL, pallets INT NOT NULL, fardos_avulsos INT NOT NULL, total_pecas_estoque INT NOT NULL, taxa_movimentacao NUMERIC(5,2), taxa_loss NUMERIC(5,2));")
-        cursor.execute("CREATE TABLE IF NOT EXISTS ordem_tno (id SERIAL PRIMARY KEY, ordem_id INT REFERENCES result_by_order(id) ON DELETE CASCADE, tipo_tno VARCHAR(100) NOT NULL, tempo_tno INT NOT NULL);")
-        cursor.execute("CREATE TABLE IF NOT EXISTS stop_machine_item (id SERIAL PRIMARY KEY, turno_id INT REFERENCES registro_turnos(id) ON DELETE CASCADE, numero_parada VARCHAR(50) NOT NULL, minutos_parados INT NOT NULL);")
-        
-        cursor.execute("SELECT id FROM usuarios WHERE login = 'admin';")
-        if not cursor.fetchone():
-            cursor.execute("INSERT INTO usuarios (login, senha, nome, nivel) VALUES ('admin', 'admin', 'Administrador Global', 3);")
-        
-        conn.commit()
-        cursor.close()
-    except Exception as e:
-        print(f"Erro Inicializacao: {e}")
-    finally:
-        if conn:
-            conn.close()
-
-inicializar_banco()
-
 class ModelAuth(BaseModel): login: str; senha: str
 class ModelUsuario(BaseModel): login: str; senha: str; nome: str; nivel: int
 class ModelSKU(BaseModel): codigo_sku: str; descricao: str; fraldas_por_pacote: int; pacotes_por_fardo: int; fardos_por_pallet: int
@@ -252,6 +217,7 @@ def visao_ordens():
     try:
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
+        # CORREÇÃO: Uso do LEFT JOIN para garantir que a OP apareça mesmo sem SKU compatível!
         cursor.execute("""
             SELECT ro.ordem, MAX(rt.maquina_numero) as maquina, ro.codigo_sku, 
             SUM(ro.machine_counter) as total_mc, SUM(ro.total_pecas_estoque) as pecas_estoque, 
@@ -260,11 +226,13 @@ def visao_ordens():
             MAX(s.fardos_por_pallet) as fat_pallet
             FROM result_by_order ro
             JOIN registro_turnos rt ON ro.turno_id = rt.id
-            JOIN master_sku s ON ro.codigo_sku = s.codigo_sku
-            GROUP BY ro.ordem, ro.codigo_sku ORDER BY ro.ordem DESC LIMIT 100;
+            LEFT JOIN master_sku s ON ro.codigo_sku = s.codigo_sku
+            GROUP BY ro.ordem, ro.codigo_sku ORDER BY ro.ordem DESC LIMIT 150;
         """)
         linhas = cursor.fetchall()
-        for l in linhas: l['total_fardos_calculado'] = (l['pallets'] * l['fat_pallet']) + l['fardos_avulsos']
+        for l in linhas: 
+            fat = l['fat_pallet'] if l['fat_pallet'] else 0
+            l['total_fardos_calculado'] = (l['pallets'] * fat) + l['fardos_avulsos']
         cursor.close()
         return linhas
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
