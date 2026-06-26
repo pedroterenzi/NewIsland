@@ -22,80 +22,124 @@
 
         * { box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; }
         body { background-color: var(--bg-color); color: var(--text-color); margin: 0; display: flex; justify-content: center; padding-bottom: 120px; overflow-x: hidden; }
-        .app-container { width: 100%; max-width: 600px; padding: 16px; margin: 0 auto; overflow-x: hidden; }
+        .app-container { width: 100%; max-width: 650px; padding: 20px; margin: 0 auto; overflow-x: hidden; }
         
-        .card { background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%); border: 1px solid var(--border-color); padding: 24px; border-radius: 20px; margin-bottom: 20px; box-shadow: 0 8px 30px rgba(0,0,0,0.5); width: 100%; }
+        .card { background: linear-gradient(145deg, #111827 0%, #0f172a 100%); border: 1px solid var(--border-color); padding: 24px; border-radius: 20px; margin-bottom: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); width: 100%; }
         
         .form-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; width: 100%; }
         .form-group label { font-size: 13px; font-weight: 600; color: var(--text-muted); }
         .form-group input, .form-group select { 
-            width: 100%; height: 48px; padding: 0 14px; background: #0f172a; border: 1px solid #334155; border-radius: 12px; color: white; font-size: 14px; transition: all 0.3s ease; -webkit-appearance: none; appearance: none;
+            width: 100%; height: 50px; padding: 0 16px; background: #0b1120; border: 1px solid #334155; border-radius: 12px; color: white; font-size: 14px; transition: all 0.3s ease; -webkit-appearance: none; appearance: none; box-sizing: border-box;
         }
-        .form-group select { background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 12px center; background-size: 16px; padding-right: 32px; }
+        .form-group select { background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 16px center; background-size: 18px; padding-right: 40px; }
         .form-group input:focus, .form-group select:focus { border-color: var(--accent-blue); outline: none; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
         
         h2, h3, h4 { color: #ffffff; margin-top: 0; font-weight: 700; letter-spacing: -0.5px; }
         h2 { font-size: 24px; text-align: center; margin-bottom: 8px; }
-        h3 { font-size: 18px; margin-bottom: 16px; color: var(--accent-orange); border-bottom: 1px solid var(--border-color); padding-bottom: 6px; }
+        h3 { font-size: 17px; margin-bottom: 20px; color: var(--accent-orange); border-bottom: 1px solid var(--border-color); padding-bottom: 8px; }
         
-        .btn-blue { width: 100%; background: var(--accent-blue); color: #fff; border: none; padding: 16px; border-radius: 14px; font-size: 15px; font-weight: 800; cursor: pointer; transition: all 0.2s ease; }
-        .btn-orange { width: 100%; background: var(--accent-orange); color: #fff; border: none; padding: 16px; border-radius: 14px; font-size: 15px; font-weight: 800; cursor: pointer; transition: all 0.2s ease; }
-        .btn-orange:disabled { opacity: 0.4; cursor: not-allowed; }
-        .btn-dash { width: 100%; background: transparent; color: var(--accent-blue); border: 1px dashed var(--accent-blue); padding: 14px; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer; margin-bottom: 16px; transition: 0.2s; }
-        .btn-dash-orange { width: 100%; background: transparent; color: var(--accent-orange); border: 1px dashed var(--accent-orange); padding: 10px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; margin-bottom: 10px; transition: 0.2s; }
+        .btn-blue { width: 100%; background: var(--accent-blue); color: #fff; border: none; padding: 16px; border-radius: 14px; font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3); }
+        .btn-blue:hover { background: var(--accent-blue-hover); transform: translateY(-2px); }
         
-        .dynamic-item { background: #0f172a; border: 1px solid #334155; padding: 18px; border-radius: 16px; margin-bottom: 15px; }
-        .dynamic-sub-item { background: #1e293b; border: 1px solid #334155; padding: 12px; border-radius: 12px; margin-bottom: 10px; }
-        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+        .btn-orange { width: 100%; background: var(--accent-orange); color: #fff; border: none; padding: 16px; border-radius: 14px; font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 4px 15px rgba(249, 115, 22, 0.3); }
+        .btn-orange:hover { background: var(--accent-orange-hover); transform: translateY(-2px); }
+        .btn-orange:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; transform: none; }
         
-        .kpi-card { background: #0f172a; border: 1px solid #334155; padding: 16px; border-radius: 16px; text-align: center;}
-        .kpi-card .kpi-label { font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;}
-        .kpi-card .kpi-val { font-size: 20px; font-weight: 800; margin-top: 6px; letter-spacing: -0.5px; }
+        .btn-dash { width: 100%; background: transparent; color: var(--accent-blue); border: 1px dashed var(--accent-blue); padding: 16px; border-radius: 14px; font-size: 14px; font-weight: 700; cursor: pointer; margin-bottom: 16px; transition: 0.2s; }
+        .btn-dash:hover { background: rgba(59, 130, 246, 0.1); }
         
-        .resumo-box { background: rgba(37, 99, 235, 0.05); border: 1px solid rgba(37, 99, 235, 0.2); padding: 16px; border-radius: 14px; margin-bottom: 20px; }
-        .resumo-item { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 6px; }
-        .status-ok { color: var(--success-color); font-weight: bold; }
-        .status-erro { color: var(--danger-color); font-weight: bold; }
+        .btn-dash-orange { width: 100%; background: transparent; color: var(--accent-orange); border: 1px dashed var(--accent-orange); padding: 12px; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; margin-bottom: 10px; transition: 0.2s; }
+        .btn-dash-orange:hover { background: rgba(249, 115, 22, 0.1); }
         
-        .nav-inferior { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: calc(100% - 20px); max-width: 580px; background: rgba(30, 41, 59, 0.95); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-evenly; align-items: center; padding: 12px 10px; border-radius: 24px; z-index: 1000; box-shadow: 0 10px 40px rgba(0,0,0,0.7); }
-        .nav-item { background: transparent; border: none; color: var(--text-muted); display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; padding: 8px 10px; border-radius: 14px; font-weight: 700; font-size: 11px; }
-        .nav-item.ativo { color: #fff; background: var(--accent-blue); }
+        .btn-small-delete { background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); padding: 10px 14px; border-radius: 10px; font-size: 12px; font-weight: 600; cursor: pointer; transition: 0.2s;}
+        .btn-small-delete:hover { background: #ef4444; color: #fff; }
+        
+        .btn-small-edit { background: rgba(59, 130, 246, 0.1); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.2); padding: 10px 14px; border-radius: 10px; font-size: 12px; font-weight: 600; cursor: pointer; transition: 0.2s;}
+        .btn-small-edit:hover { background: #3b82f6; color: #fff; }
+        
+        .dynamic-item { background: #0f172a; border: 1px solid #1e293b; padding: 20px; border-radius: 16px; margin-bottom: 16px; }
+        .dynamic-sub-item { background: #1e293b; border: 1px solid #334155; padding: 16px; border-radius: 12px; margin-bottom: 12px; }
+        .item-list { background: #0f172a; border: 1px solid #1e293b; padding: 18px; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+        .grid-indicadores { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-bottom: 24px; }
+        
+        .kpi-card { background: #0f172a; border: 1px solid #1e293b; padding: 18px; border-radius: 16px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.2);}
+        .kpi-card .kpi-label { font-size: 11px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;}
+        .kpi-card .kpi-val { font-size: 22px; font-weight: 800; margin-top: 8px; letter-spacing: -0.5px; }
+        
+        .resumo-box { background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.2); padding: 18px; border-radius: 16px; margin-bottom: 20px; }
+        .resumo-item { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 8px; color: var(--text-muted);}
+        .status-ok { color: var(--success-color); font-weight: 800; }
+        .status-erro { color: var(--danger-color); font-weight: 800; }
+        
+        .nav-inferior { 
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); 
+            width: calc(100% - 32px); max-width: 500px; 
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255,255,255,0.08); 
+            display: flex; justify-content: space-between; align-items: center; 
+            padding: 8px 16px; border-radius: 100px;
+            z-index: 1000; box-shadow: 0 10px 40px rgba(0,0,0,0.6); 
+        }
+        .nav-item { 
+            background: transparent; border: none; color: #64748b; 
+            display: flex; flex-direction: column; align-items: center; gap: 4px; 
+            cursor: pointer; padding: 8px 12px; border-radius: 20px; 
+            font-weight: 600; font-size: 11px; transition: all 0.3s ease;
+        }
+        .nav-item .icon { font-size: 20px; margin-bottom: 2px; transition: transform 0.2s ease;}
+        .nav-item.ativo { color: var(--accent-orange); background: rgba(249, 115, 22, 0.1); }
+        .nav-item.ativo .icon { transform: scale(1.1); }
+        .nav-item.sair:hover { color: var(--danger-color); background: rgba(239, 68, 68, 0.1); }
         
         .escondido { display: none !important; }
-        .item-list { background: #0f172a; border: 1px solid #334155; padding: 16px; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .btn-small-delete { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); padding: 8px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer;}
-        .btn-small-edit { background: rgba(37, 99, 235, 0.15); color: #3b82f6; border: 1px solid rgba(37, 99, 235, 0.3); padding: 8px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer;}
         
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(5px); display: flex; justify-content: center; align-items: center; z-index: 2000; padding: 20px; }
-        .modal-content { background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%); border: 1px solid #334155; border-radius: 20px; padding: 28px; width: 100%; max-width: 420px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 40px rgba(0,0,0,0.6);}
-        
-        .table-wrapper { width: 100%; overflow-x: auto; border-radius: 12px; border: 1px solid var(--border-color); background: #0f172a; box-shadow: inset 0 4px 6px rgba(0,0,0,0.1);}
+        .table-wrapper { width: 100%; overflow-x: auto; border-radius: 14px; border: 1px solid var(--border-color); background: #0f172a; box-shadow: inset 0 4px 6px rgba(0,0,0,0.1);}
         .table-premium { width: 100%; border-collapse: separate; border-spacing: 0; text-align: left; font-size: 13px; white-space: nowrap; }
-        .table-premium th { background: #1e293b; color: var(--accent-orange); padding: 16px; font-weight: 700; border-bottom: 2px solid var(--border-color); text-transform: uppercase; letter-spacing: 0.5px; position: sticky; top: 0; z-index: 2;}
+        .table-premium th { background: #111827; color: var(--accent-orange); padding: 16px; font-weight: 700; border-bottom: 2px solid #1e293b; text-transform: uppercase; letter-spacing: 0.5px; position: sticky; top: 0; z-index: 2;}
         .table-premium td { padding: 16px; border-bottom: 1px solid #1e293b; color: var(--text-color); transition: background 0.2s;}
-        .table-premium tr:hover td { background: rgba(37, 99, 235, 0.1); }
+        .table-premium tr:hover td { background: rgba(59, 130, 246, 0.05); }
         .table-premium tr:last-child td { border-bottom: none; }
-        .badge-success { background: rgba(16, 185, 129, 0.1); color: var(--success-color); padding: 4px 8px; border-radius: 6px; font-weight: 700; }
-        .badge-danger { background: rgba(239, 68, 68, 0.1); color: var(--danger-color); padding: 4px 8px; border-radius: 6px; font-weight: 700; }
-        .badge-blue { background: rgba(37, 99, 235, 0.1); color: var(--accent-blue); padding: 4px 8px; border-radius: 6px; font-weight: 700; }
+        .badge-success { background: rgba(16, 185, 129, 0.1); color: var(--success-color); padding: 6px 10px; border-radius: 8px; font-weight: 700; }
+        .badge-danger { background: rgba(239, 68, 68, 0.1); color: var(--danger-color); padding: 6px 10px; border-radius: 8px; font-weight: 700; }
+        .badge-blue { background: rgba(59, 130, 246, 0.1); color: var(--accent-blue); padding: 6px 10px; border-radius: 8px; font-weight: 700; }
+        
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); display: flex; justify-content: center; align-items: center; z-index: 2000; padding: 20px; }
+        .modal-content { background: linear-gradient(145deg, #111827 0%, #0f172a 100%); border: 1px solid #1e293b; border-radius: 24px; padding: 32px; width: 100%; max-width: 440px; max-height: 90vh; overflow-y: auto; box-shadow: 0 25px 50px rgba(0,0,0,0.6);}
+
+        @media (max-width: 500px) {
+            .grid-2, .grid-3 { grid-template-columns: 1fr; gap: 12px; }
+            .grid-indicadores { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+            .kpi-card { padding: 14px 10px; }
+            .kpi-card .kpi-val { font-size: 18px; }
+            .app-container { padding: 12px; }
+            .card { padding: 20px; }
+            .modal-content { padding: 20px; }
+            h2 { font-size: 22px; }
+            .item-list { flex-direction: column; align-items: flex-start; gap: 12px; }
+            .item-list > div:last-child { width: 100%; display: flex; gap: 8px; }
+            .item-list > div:last-child button { flex: 1; margin: 0; }
+        }
     </style>
 </head>
 <body>
 
 <div class="app-container">
 
-    <div id="tela-login" class="card" style="margin-top: 15vh;">
-        <h2>Unicharm Control</h2>
-        <p style="text-align:center; color:var(--text-muted); font-size: 14px; margin-bottom: 25px;">Apontamento Eletrônico de Produção</p>
-        <div class="form-group"><label>Usuário:</label><input type="text" id="login-usuario"></div>
-        <div class="form-group"><label>Senha:</label><input type="password" id="login-senha"></div>
-        <button class="btn-blue" id="btn-entrar" onclick="executarLogin()">Entrar no Sistema</button>
+    <div id="tela-login" class="card" style="margin-top: 10vh;">
+        <h2 style="color: var(--accent-blue);">Unicharm Control</h2>
+        <p style="text-align:center; color:var(--text-muted); font-size: 14px; margin-bottom: 30px;">Gestão Eletrônica de Produção</p>
+        <div class="form-group"><label>Usuário:</label><input type="text" id="login-usuario" placeholder="Digite seu login"></div>
+        <div class="form-group"><label>Senha:</label><input type="password" id="login-senha" placeholder="Digite sua senha"></div>
+        <button class="btn-blue" id="btn-entrar" onclick="executarLogin()" style="margin-top: 10px;">Acessar Sistema</button>
     </div>
 
     <div id="tela-operador" class="escondido aba-conteudo">
-        <div style="margin-bottom: 20px; text-align: center;">
-            <h2 id="titulo-apontamento" style="font-size: 22px; margin-bottom: 4px;">Apontamento Diário</h2>
+        <div style="margin-bottom: 24px; text-align: center;">
+            <h2 id="titulo-apontamento">Apontamento Diário</h2>
             <p id="txt-user" style="margin:0; color: var(--accent-orange); font-weight: bold; font-size: 14px;">Operador: ...</p>
         </div>
 
@@ -134,73 +178,83 @@
             <div class="resumo-box">
                 <div class="resumo-item"><span>Carga Padrão Turno:</span> <span id="res-carga">455m</span></div>
                 <div class="resumo-item"><span>HP Total + TNO Lançado:</span> <span id="res-total" class="status-erro">0m</span></div>
-                <div style="border-top: 1px dashed var(--border-color); margin: 8px 0;"></div>
+                <div style="border-top: 1px dashed rgba(255,255,255,0.1); margin: 12px 0;"></div>
                 <div class="resumo-item"><span>Paradas Reais Calculadas:</span> <span id="res-parada-calc">0m</span></div>
                 <div class="resumo-item"><span>Paradas Lançadas na Aba:</span> <span id="res-parada-apon" class="status-erro">0m</span></div>
             </div>
             <button class="btn-orange" id="btn-enviar-apontamento" onclick="enviarApontamento()" disabled>Gravar Apontamento</button>
-            <button class="btn-dash escondido" id="btn-cancelar-edicao" style="margin-top:10px; border-color:var(--danger-color); color:var(--danger-color);" onclick="cancelarEdicaoApontamento()">Cancelar Edição</button>
+            <button class="btn-dash escondido" id="btn-cancelar-edicao" style="margin-top:16px; border-color:var(--danger-color); color:var(--danger-color);" onclick="cancelarEdicaoApontamento()">Cancelar Edição</button>
         </div>
     </div>
 
     <div id="tela-lancamentos" class="escondido aba-conteudo">
-        <h2 style="text-align: left; margin-bottom: 20px; color: var(--accent-blue);">Lançamentos de Turno</h2>
+        <h2 style="text-align: left; margin-bottom: 20px;">Lançamentos de Turno</h2>
         <div class="card">
-            <h3 style="color: var(--accent-orange);">Filtros Dinâmicos</h3>
+            <h3>Filtros Dinâmicos</h3>
             <div class="grid-2">
                 <div class="form-group"><label>Data:</label><input type="date" id="filtro-data" onchange="filtrarLancamentos()"></div>
                 <div class="form-group"><label>Turno:</label><select id="filtro-turno" onchange="filtrarLancamentos()"><option value="">Todos</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></div>
             </div>
             <div class="grid-2">
                 <div class="form-group"><label>Máquina:</label><input type="number" id="filtro-maq" placeholder="Nº da Mák" oninput="filtrarLancamentos()"></div>
-                <div class="form-group"><label>OP:</label><input type="text" id="filtro-op" placeholder="Nº Ordem" oninput="filtrarLancamentos()"></div>
+                <div class="form-group"><label>Ordem (OP):</label><input type="text" id="filtro-op" placeholder="Nº da Ordem" oninput="filtrarLancamentos()"></div>
             </div>
         </div>
         <div id="resultados-lancamentos"></div>
     </div>
 
     <div id="tela-visao" class="escondido aba-conteudo">
-        <h2 style="text-align: left; margin-bottom: 8px; color: var(--accent-blue);">Visão por OP (TOTVS)</h2>
+        <h2 style="text-align: left; margin-bottom: 8px; color: var(--accent-blue);">Visão por OP & Validação TOTVS</h2>
         <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 24px; margin-top:0;">Acumulado de turnos para validação sistêmica.</p>
+        
+        <div class="card" style="margin-bottom: 20px;">
+            <h3 style="margin-bottom: 12px; font-size: 15px;">📥 Importar Planilha do TOTVS (CSV)</h3>
+            <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                <input type="file" id="upload-totvs" accept=".csv" style="background: transparent; border: 1px solid var(--border-color); color: white; padding: 10px; border-radius: 8px; flex: 1; min-width: 200px;">
+                <button class="btn-blue" style="width: auto; padding: 12px 24px;" onclick="processarTotvs()">Validar Dados</button>
+            </div>
+            <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">A planilha deve conter as colunas "Lote" e "Qtde Apontada".</p>
+        </div>
+
         <div class="table-wrapper">
             <table class="table-premium" id="tabela-visao-op">
-                <thead><tr><th>OP</th><th>Mák</th><th>SKU</th><th>Peças Estoque</th><th>Fardos</th><th>HP (m)</th><th>RT (m)</th><th>Loss</th></tr></thead>
+                <thead><tr><th>OP / Lote</th><th>Mák</th><th>SKU</th><th>Fardos (App)</th><th>Fardos (TOTVS)</th><th>Status</th><th>Peças Estoque</th><th>Loss</th></tr></thead>
                 <tbody></tbody>
             </table>
         </div>
     </div>
 
     <div id="tela-admin" class="escondido aba-conteudo">
-        <h2 style="text-align: left; margin-bottom: 24px; color: var(--accent-blue);">Gestão de Cadastros</h2>
+        <h2 style="text-align: left; margin-bottom: 24px;">Gestão de Cadastros</h2>
         
         <div class="card">
             <h3>Máquinas da Planta</h3>
             <button class="btn-dash" onclick="abrirModal('modal-maq')">+ Adicionar Máquina</button>
-            <div id="lista-admin-maquinas" style="max-height: 250px; overflow-y:auto;"></div>
+            <div id="lista-admin-maquinas" style="max-height: 300px; overflow-y:auto; padding-right: 8px;"></div>
         </div>
 
         <div class="card">
             <h3>Catálogo de Produtos (SKU)</h3>
             <button class="btn-dash" onclick="abrirModal('modal-sku')">+ Adicionar Produto</button>
-            <div id="lista-admin-skus" style="max-height: 250px; overflow-y:auto;"></div>
+            <div id="lista-admin-skus" style="max-height: 300px; overflow-y:auto; padding-right: 8px;"></div>
         </div>
 
         <div class="card">
             <h3>Códigos de Parada</h3>
             <button class="btn-dash" onclick="abrirModal('modal-parada')">+ Adicionar Código</button>
-            <div id="lista-admin-paradas" style="max-height: 250px; overflow-y:auto;"></div>
+            <div id="lista-admin-paradas" style="max-height: 300px; overflow-y:auto; padding-right: 8px;"></div>
         </div>
 
         <div class="card">
             <h3>Tipos de TNO</h3>
             <button class="btn-dash" onclick="abrirModal('modal-tno')">+ Adicionar Classificação TNO</button>
-            <div id="lista-admin-tnos" style="max-height: 250px; overflow-y:auto;"></div>
+            <div id="lista-admin-tnos" style="max-height: 300px; overflow-y:auto; padding-right: 8px;"></div>
         </div>
 
         <div class="card">
             <h3>Equipe (Usuários)</h3>
             <button class="btn-dash" onclick="abrirModal('modal-usuario')">+ Adicionar Usuário</button>
-            <div id="lista-admin-usuarios" style="max-height: 250px; overflow-y:auto;"></div>
+            <div id="lista-admin-usuarios" style="max-height: 300px; overflow-y:auto; padding-right: 8px;"></div>
         </div>
     </div>
 
@@ -209,7 +263,7 @@
         <button class="nav-item restrito-lider-adm" id="nav-lancamentos" onclick="navegarPara('lancamentos')"><div class="icon">🔎</div>Registros</button>
         <button class="nav-item restrito-lider-adm" id="nav-visao" onclick="navegarPara('visao')"><div class="icon">📊</div>Visão OP</button>
         <button class="nav-item restrito-lider-adm" id="nav-admin" onclick="navegarPara('admin')"><div class="icon">⚙️</div>Gestão</button>
-        <button class="nav-item" style="color: var(--danger-color);" onclick="sair()"><div class="icon">🚪</div>Sair</button>
+        <button class="nav-item sair" onclick="sair()"><div class="icon">🚪</div>Sair</button>
     </nav>
 
 </div>
@@ -225,8 +279,8 @@
             <div class="form-group"><label>Pct/Fardo:</label><input type="number" id="form-sku-pac"></div>
             <div class="form-group"><label>Fardos/Pallet:</label><input type="number" id="form-sku-far"></div>
         </div>
-        <button class="btn-blue" onclick="salvarSku()">Salvar</button>
-        <button class="btn-dash" style="margin-top:10px; border-color:var(--text-muted); color:var(--text-muted);" onclick="fecharModal('modal-sku')">Cancelar</button>
+        <button class="btn-blue" onclick="salvarSku()" style="margin-top: 8px;">Salvar Cadastro</button>
+        <button class="btn-dash" style="margin-top:12px; border-color:var(--text-muted); color:var(--text-muted);" onclick="fecharModal('modal-sku')">Cancelar</button>
     </div>
 </div>
 
@@ -237,8 +291,8 @@
         <div class="form-group"><label>Número:</label><input type="number" id="form-maq-num"></div>
         <div class="form-group"><label>Segmento:</label><select id="form-maq-tipo"><option value="baby_care">Baby Care</option><option value="adult_care">Adulto Geriátrico</option></select></div>
         <div class="form-group"><label>Status:</label><select id="form-maq-ativo"><option value="true">Ativa</option><option value="false">Desativada</option></select></div>
-        <button class="btn-blue" onclick="salvarMaquina()">Salvar</button>
-        <button class="btn-dash" style="margin-top:10px; border-color:var(--text-muted); color:var(--text-muted);" onclick="fecharModal('modal-maq')">Cancelar</button>
+        <button class="btn-blue" onclick="salvarMaquina()" style="margin-top: 8px;">Salvar Máquina</button>
+        <button class="btn-dash" style="margin-top:12px; border-color:var(--text-muted); color:var(--text-muted);" onclick="fecharModal('modal-maq')">Cancelar</button>
     </div>
 </div>
 
@@ -249,8 +303,8 @@
         <div class="form-group"><label>Segmento:</label><select id="form-parada-tipo"><option value="baby_care">Baby Care</option><option value="adult_care">Adulto Care</option></select></div>
         <div class="form-group"><label>Nº Código:</label><input type="text" id="form-parada-num"></div>
         <div class="form-group"><label>Problema:</label><input type="text" id="form-parada-prob"></div>
-        <button class="btn-blue" onclick="salvarParada()">Salvar</button>
-        <button class="btn-dash" style="margin-top:10px; border-color:var(--text-muted); color:var(--text-muted);" onclick="fecharModal('modal-parada')">Cancelar</button>
+        <button class="btn-blue" onclick="salvarParada()" style="margin-top: 8px;">Salvar Código</button>
+        <button class="btn-dash" style="margin-top:12px; border-color:var(--text-muted); color:var(--text-muted);" onclick="fecharModal('modal-parada')">Cancelar</button>
     </div>
 </div>
 
@@ -259,8 +313,8 @@
         <h3 id="modal-tno-titulo">Classificação TNO</h3>
         <input type="hidden" id="form-tno-id">
         <div class="form-group"><label>Nome:</label><input type="text" id="form-tno-nome"></div>
-        <button class="btn-blue" onclick="salvarTno()">Salvar</button>
-        <button class="btn-dash" style="margin-top:10px; border-color:var(--text-muted); color:var(--text-muted);" onclick="fecharModal('modal-tno')">Cancelar</button>
+        <button class="btn-blue" onclick="salvarTno()" style="margin-top: 8px;">Salvar TNO</button>
+        <button class="btn-dash" style="margin-top:12px; border-color:var(--text-muted); color:var(--text-muted);" onclick="fecharModal('modal-tno')">Cancelar</button>
     </div>
 </div>
 
@@ -272,8 +326,8 @@
         <div class="form-group"><label>Login:</label><input type="text" id="form-u-login"></div>
         <div class="form-group"><label>Senha (Atualize p/ salvar):</label><input type="password" id="form-u-senha"></div>
         <div class="form-group"><label>Acesso:</label><select id="form-u-nivel"><option value="1">Operador</option><option value="2">Liderança</option><option value="3">Admin</option></select></div>
-        <button class="btn-blue" onclick="salvarUsuario()">Salvar</button>
-        <button class="btn-dash" style="margin-top:10px; border-color:var(--text-muted); color:var(--text-muted);" onclick="fecharModal('modal-usuario')">Cancelar</button>
+        <button class="btn-blue" onclick="salvarUsuario()" style="margin-top: 8px;">Salvar Colaborador</button>
+        <button class="btn-dash" style="margin-top:12px; border-color:var(--text-muted); color:var(--text-muted);" onclick="fecharModal('modal-usuario')">Cancelar</button>
     </div>
 </div>
 
