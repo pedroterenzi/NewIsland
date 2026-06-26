@@ -14,6 +14,8 @@ async function executarLogin() {
     btn.innerText = "Conectando..."; 
     btn.disabled = true;
 
+    let loginSucesso = false;
+
     try {
         const res = await fetch(`${API_URL}/usuarios/auth`, {
             method: 'POST', 
@@ -23,13 +25,18 @@ async function executarLogin() {
         
         if (res.ok) {
             usuarioLogado = await res.json();
-            await inicializarPainel();
+            loginSucesso = true;
         } else {
             alert("Credenciais incorretas.");
         }
     } catch (e) {
-        alert("Servidor inicializando. Aguarde 5 segundos e clique em entrar novamente.");
-    } finally {
+        alert("O servidor está despertando. Aguarde 5 segundos e clique novamente.");
+    }
+
+    if (loginSucesso) {
+        btn.innerText = "Sincronizando Dados...";
+        await inicializarPainel();
+    } else {
         btn.innerText = "Entrar no Sistema"; 
         btn.disabled = false;
     }
@@ -48,9 +55,13 @@ async function inicializarPainel() {
     const inputData = document.getElementById('ap-data');
     if (inputData) inputData.value = new Date().toISOString().split('T')[0];
 
-    await baixarDadosMestres();
-    preencherSeletoresIniciais();
-    navegarPara('operador');
+    const sucesso = await baixarDadosMestres();
+    if (sucesso) {
+        preencherSeletoresIniciais();
+        navegarPara('operador');
+    } else {
+        alert("Falha ao baixar dados da Nuvem. O painel não funcionará corretamente. Recarregue a página.");
+    }
 }
 
 async function baixarDadosMestres() {
@@ -63,11 +74,10 @@ async function baixarDadosMestres() {
             MESTRE_TNOS = data.tnos || [];
             MESTRE_MAQUINAS = data.maquinas || [];
             MESTRE_USUARIOS = data.usuarios || [];
-        } else {
-            const err = await res.json();
-            alert("Erro do Servidor: " + err.detail);
+            return true;
         }
     } catch (e) { console.error("Erro dados mestres", e); }
+    return false;
 }
 
 // ================= NAVEGAÇÃO =================
@@ -93,10 +103,12 @@ function fecharModal(id) { document.getElementById(id).classList.add('escondido'
 // ================= TELA APONTAMENTO =================
 function preencherSeletoresIniciais() {
     const selMq = document.getElementById('ap-maquina');
-    if (MESTRE_MAQUINAS.length > 0) {
-        selMq.innerHTML = MESTRE_MAQUINAS.filter(m => m.ativo).map(m => `<option value="${m.numero_maquina}">Máquina ${m.numero_maquina} (${m.tipo==='baby_care'?'Baby':'Adulto'})</option>`).join('');
+    const maqAtivas = MESTRE_MAQUINAS.filter(m => m.ativo);
+    
+    if (maqAtivas.length > 0) {
+        selMq.innerHTML = maqAtivas.map(m => `<option value="${m.numero_maquina}">Máquina ${m.numero_maquina} (${m.tipo==='baby_care'?'Baby':'Adulto'})</option>`).join('');
     } else {
-        selMq.innerHTML = '<option value="">Sem máquinas</option>';
+        selMq.innerHTML = '<option value="">Sem máquinas cadastradas</option>';
     }
     
     document.getElementById('container-ordens').innerHTML = '';
@@ -274,7 +286,8 @@ async function enviarApontamento() {
     document.querySelectorAll(".card-ordem").forEach(div => {
         const tnos = [];
         div.querySelectorAll('.card-tno').forEach(t => {
-            tnos.push({ tipo_tno: t.querySelector('.tno-tipo').value, tempo_tno: parseInt(t.querySelector('.tno-minutos').value || 0) });
+            const tipo = t.querySelector('.tno-tipo').value;
+            if (tipo) tnos.push({ tipo_tno: tipo, tempo_tno: parseInt(t.querySelector('.tno-minutos').value || 0) });
         });
 
         payload.ordens.push({
@@ -309,7 +322,7 @@ async function enviarApontamento() {
         } else {
             const err = await res.json(); alert(`Atenção: ${err.detail}`);
         }
-    } catch(e) { alert("Erro de rede. Verifique sua conexão."); }
+    } catch(e) { alert("Erro de rede ao salvar apontamento."); }
     finally { btn.innerText = editandoTurnoId ? "Atualizar Turno" : "Gravar Apontamento"; calcularResumo(); }
 }
 
@@ -419,7 +432,7 @@ async function carregarParaEdicao(id) {
             const err = await res.json();
             alert(`Falha do servidor: ${err.detail}`);
         }
-    } catch(e) { alert("Erro fatal de carregamento: O servidor pode estar dormindo ou o banco rejeitou o chamado."); }
+    } catch(e) { alert(`Erro fatal de carregamento: ${e.message}`); }
 }
 
 // ================= TELA VISÃO OP =================
