@@ -17,62 +17,41 @@ app.add_middleware(
 
 DATABASE_URL = "postgresql://neondb_owner:npg_G9jBAgO0hpXr@ep-broad-sky-ate4cjbm.c-9.us-east-1.aws.neon.tech/neondb?sslmode=require"
 
+def get_db_connection():
+    return psycopg2.connect(DATABASE_URL)
+
 def inicializar_banco():
-    def sql_seguro(conn, query, params=None):
-        try:
-            cursor = conn.cursor()
-            if params: cursor.execute(query, params)
-            else: cursor.execute(query)
-            conn.commit()
-            cursor.close()
-        except Exception as e:
-            conn.rollback()
-
+    conn = None
     try:
-        with psycopg2.connect(DATABASE_URL) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_name='ordem_tno';")
-            if not cursor.fetchone():
-                cursor.execute("DROP TABLE IF EXISTS ordem_tno, result_by_order, stop_machine_item, registro_turnos, codigos_parada, master_sku, tipos_tno, maquinas, usuarios CASCADE;")
-                conn.commit()
-            cursor.close()
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_name='ordem_tno';")
+        if not cursor.fetchone():
+            cursor.execute("DROP TABLE IF EXISTS ordem_tno, result_by_order, stop_machine_item, registro_turnos, codigos_parada, master_sku, tipos_tno, maquinas, usuarios CASCADE;")
+            conn.commit()
 
-            sql_seguro(conn, "CREATE TABLE IF NOT EXISTS usuarios (id SERIAL PRIMARY KEY, login VARCHAR(100) UNIQUE NOT NULL, senha VARCHAR(100) NOT NULL, nome VARCHAR(255) NOT NULL, nivel INT DEFAULT 1);")
-            sql_seguro(conn, "INSERT INTO usuarios (login, senha, nome, nivel) VALUES ('admin', 'admin', 'Administrador Global', 3) ON CONFLICT (login) DO NOTHING;")
-
-            sql_seguro(conn, "CREATE TABLE IF NOT EXISTS maquinas (id SERIAL PRIMARY KEY, numero_maquina INT UNIQUE NOT NULL, tipo VARCHAR(50) NOT NULL, ativo BOOLEAN DEFAULT TRUE);")
-            maquinas = [(1, 'adult_care'), (2, 'baby_care'), (3, 'baby_care'), (4, 'baby_care'), (5, 'baby_care'), (6, 'baby_care'), (7, 'adult_care')]
-            for n, t in maquinas: sql_seguro(conn, "INSERT INTO maquinas (numero_maquina, tipo) VALUES (%s, %s) ON CONFLICT (numero_maquina) DO NOTHING;", (n, t))
-
-            sql_seguro(conn, "CREATE TABLE IF NOT EXISTS tipos_tno (id SERIAL PRIMARY KEY, nome VARCHAR(100) UNIQUE NOT NULL);")
-            tnos = ['Manutenção', 'Limpeza', 'Ajuste de Partida de Máquina', 'Troca de Tamanho de Máquina', 'Ajuste Após Troca de Tamanho Máquina', 'Troca de Optima', 'Troca de Dosetec', 'Checagem de Liberação do Operador', 'Parada Programada', 'Parada por Falta / Problema de MP', 'Liberação de Linha Qualidade', 'Amostragem (Sampling)', 'Segurança do Trabalho', 'Outros']
-            for tno in tnos: sql_seguro(conn, "INSERT INTO tipos_tno (nome) VALUES (%s) ON CONFLICT (nome) DO NOTHING;", (tno,))
-
-            sql_seguro(conn, """CREATE TABLE IF NOT EXISTS master_sku (id SERIAL PRIMARY KEY, codigo_sku VARCHAR(100) UNIQUE NOT NULL, descricao VARCHAR(255), fraldas_por_pacote INT NOT NULL, pacotes_por_fardo INT NOT NULL, fardos_por_pallet INT NOT NULL);""")
-            skus_carga = [
-                ('1000', 'RN-TESTE', 4, 63, 18), ('2000', 'P-TESTE', 4, 48, 18), ('3000', 'M-TESTE', 1, 120, 18), 
-                ('4000', 'G-TESTE', 1, 120, 18), ('5000', 'XG-TESTE', 1, 100, 18), ('6000', 'XXG-TESTE', 1, 100, 18),
-                ('11151', 'P50 IGUAÇU', 50, 4, 25), ('12111', 'M20 IGUAÇU', 20, 6, 30), ('12121', 'G17 IGUAÇU', 17, 6, 36), 
-                ('12131', 'XG15 IGUAÇU', 15, 6, 36), ('12141', 'P24 Cuidado Real', 24, 6, 24), ('12151', 'XXG13 IGUAÇU', 13, 6, 32),
-                ('12161', 'M18 IGUAÇU', 18, 6, 36), ('12171', 'G16 IGUAÇU', 16, 6, 30), ('12181', 'XG14 IGUAÇU', 14, 6, 36),
-                ('12191', 'XXG12 IGUAÇU', 12, 6, 32), ('12201', 'P22 IGUAÇU', 22, 6, 30), ('12301', 'RN20 D&N', 20, 6, 30),
-                ('13101', 'G28 D&N', 28, 4, 32), ('13201', 'XG24 D&N', 24, 4, 32), ('13301', 'XXG22 SP', 22, 4, 36),
-                ('13401', 'M34 SP', 34, 4, 30), ('14101', 'M34 Super Proteção', 34, 4, 30), ('14201', 'M18 Super Proteção', 18, 6, 36),
-                ('21111', 'RG 20 PAD', 20, 6, 24), ('32321', 'G30 CR Pelé', 30, 4, 30), ('32131', 'XG26 CR Senna', 26, 4, 36)
-            ]
-            for s in skus_carga: sql_seguro(conn, "INSERT INTO master_sku (codigo_sku, descricao, fraldas_por_pacote, pacotes_por_fardo, fardos_por_pallet) VALUES (%s, %s, %s, %s, %s) ON CONFLICT (codigo_sku) DO NOTHING;", s)
-
-            sql_seguro(conn, "CREATE TABLE IF NOT EXISTS codigos_parada (id SERIAL PRIMARY KEY, tipo_maquina VARCHAR(50) NOT NULL, numero VARCHAR(50) NOT NULL, problema VARCHAR(255) NOT NULL, UNIQUE(tipo_maquina, numero));")
-            paradas_baby = [('1', 'Problemas triturador'), ('2', 'Linha Pulp'), ('101', 'OPTIMA STACKER'), ('124', 'Defeito SAP')]
-            paradas_adult = [('1', 'Problemas triturador'), ('2', 'Linha Pulp'), ('93', 'Optima Stacker')]
-            for num, prob in paradas_baby: sql_seguro(conn, "INSERT INTO codigos_parada (tipo_maquina, numero, problema) VALUES ('baby_care', %s, %s) ON CONFLICT ON CONSTRAINT codigos_parada_tipo_maquina_numero_key DO NOTHING;", (num, prob))
-            for num, prob in paradas_adult: sql_seguro(conn, "INSERT INTO codigos_parada (tipo_maquina, numero, problema) VALUES ('adult_care', %s, %s) ON CONFLICT ON CONSTRAINT codigos_parada_tipo_maquina_numero_key DO NOTHING;", (num, prob))
-
-            sql_seguro(conn, "CREATE TABLE IF NOT EXISTS registro_turnos (id SERIAL PRIMARY KEY, data_registro DATE NOT NULL, turno INT NOT NULL, operador VARCHAR(255) NOT NULL, maquina_numero INT NOT NULL);")
-            sql_seguro(conn, """CREATE TABLE IF NOT EXISTS result_by_order (id SERIAL PRIMARY KEY, turno_id INT REFERENCES registro_turnos(id) ON DELETE CASCADE, ordem VARCHAR(100) NOT NULL, codigo_sku VARCHAR(100) NOT NULL, horario_padrao INT NOT NULL, run_time INT NOT NULL, machine_counter INT NOT NULL, pallets INT NOT NULL, fardos_avulsos INT NOT NULL, total_pecas_estoque INT NOT NULL, taxa_movimentacao NUMERIC(5,2), taxa_loss NUMERIC(5,2));""")
-            sql_seguro(conn, "CREATE TABLE IF NOT EXISTS ordem_tno (id SERIAL PRIMARY KEY, ordem_id INT REFERENCES result_by_order(id) ON DELETE CASCADE, tipo_tno VARCHAR(100) NOT NULL, tempo_tno INT NOT NULL);")
-            sql_seguro(conn, "CREATE TABLE IF NOT EXISTS stop_machine_item (id SERIAL PRIMARY KEY, turno_id INT REFERENCES registro_turnos(id) ON DELETE CASCADE, numero_parada VARCHAR(50) NOT NULL, minutos_parados INT NOT NULL);")
-    except Exception as e: print(f"Falha Geral: {str(e)}")
+        cursor.execute("CREATE TABLE IF NOT EXISTS usuarios (id SERIAL PRIMARY KEY, login VARCHAR(100) UNIQUE NOT NULL, senha VARCHAR(100) NOT NULL, nome VARCHAR(255) NOT NULL, nivel INT DEFAULT 1);")
+        cursor.execute("CREATE TABLE IF NOT EXISTS maquinas (id SERIAL PRIMARY KEY, numero_maquina INT UNIQUE NOT NULL, tipo VARCHAR(50) NOT NULL, ativo BOOLEAN DEFAULT TRUE);")
+        cursor.execute("CREATE TABLE IF NOT EXISTS tipos_tno (id SERIAL PRIMARY KEY, nome VARCHAR(100) UNIQUE NOT NULL);")
+        cursor.execute("CREATE TABLE IF NOT EXISTS master_sku (id SERIAL PRIMARY KEY, codigo_sku VARCHAR(100) UNIQUE NOT NULL, descricao VARCHAR(255), fraldas_por_pacote INT NOT NULL, pacotes_por_fardo INT NOT NULL, fardos_por_pallet INT NOT NULL);")
+        cursor.execute("CREATE TABLE IF NOT EXISTS codigos_parada (id SERIAL PRIMARY KEY, tipo_maquina VARCHAR(50) NOT NULL, numero VARCHAR(50) NOT NULL, problema VARCHAR(255) NOT NULL, UNIQUE(tipo_maquina, numero));")
+        cursor.execute("CREATE TABLE IF NOT EXISTS registro_turnos (id SERIAL PRIMARY KEY, data_registro DATE NOT NULL, turno INT NOT NULL, operador VARCHAR(255) NOT NULL, maquina_numero INT NOT NULL);")
+        cursor.execute("CREATE TABLE IF NOT EXISTS result_by_order (id SERIAL PRIMARY KEY, turno_id INT REFERENCES registro_turnos(id) ON DELETE CASCADE, ordem VARCHAR(100) NOT NULL, codigo_sku VARCHAR(100) NOT NULL, horario_padrao INT NOT NULL, run_time INT NOT NULL, machine_counter INT NOT NULL, pallets INT NOT NULL, fardos_avulsos INT NOT NULL, total_pecas_estoque INT NOT NULL, taxa_movimentacao NUMERIC(5,2), taxa_loss NUMERIC(5,2));")
+        cursor.execute("CREATE TABLE IF NOT EXISTS ordem_tno (id SERIAL PRIMARY KEY, ordem_id INT REFERENCES result_by_order(id) ON DELETE CASCADE, tipo_tno VARCHAR(100) NOT NULL, tempo_tno INT NOT NULL);")
+        cursor.execute("CREATE TABLE IF NOT EXISTS stop_machine_item (id SERIAL PRIMARY KEY, turno_id INT REFERENCES registro_turnos(id) ON DELETE CASCADE, numero_parada VARCHAR(50) NOT NULL, minutos_parados INT NOT NULL);")
+        
+        cursor.execute("SELECT id FROM usuarios WHERE login = 'admin';")
+        if not cursor.fetchone():
+            cursor.execute("INSERT INTO usuarios (login, senha, nome, nivel) VALUES ('admin', 'admin', 'Administrador Global', 3);")
+        
+        conn.commit()
+        cursor.close()
+    except Exception as e:
+        print(f"Erro Inicializacao: {e}")
+    finally:
+        if conn:
+            conn.close()
 
 inicializar_banco()
 
@@ -94,28 +73,38 @@ class PayloadApontamento(BaseModel): data_registro: str; turno: int; operador: s
 def autenticar(obj: ModelAuth):
     login = obj.login.strip().lower()
     if login == "admin" and obj.senha == "admin": return {"login": "admin", "nome": "Administrador Global", "nivel": 3}
+    
+    conn = None
     try:
-        with psycopg2.connect(DATABASE_URL) as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute("SELECT login, nome, nivel FROM usuarios WHERE login = %s AND senha = %s;", (login, obj.senha))
-                user = cursor.fetchone()
-                if user: return dict(user)
-    except Exception: pass
-    raise HTTPException(status_code=401, detail="Usuário/Senha inválidos")
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("SELECT login, nome, nivel FROM usuarios WHERE login = %s AND senha = %s;", (login, obj.senha))
+        user = cursor.fetchone()
+        cursor.close()
+        if user: return user
+        raise HTTPException(status_code=401, detail="Usuário ou senha inválidos")
+    except HTTPException as h: raise h
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: conn.close()
 
 @app.get("/dados-mestres")
 def obter_dados_mestres():
-    dados = {"skus": [], "paradas": [], "tnos": [], "maquinas": [], "usuarios": []}
+    conn = None
     try:
-        with psycopg2.connect(DATABASE_URL) as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute("SELECT * FROM master_sku ORDER BY codigo_sku ASC;"); dados["skus"] = [dict(x) for x in cursor.fetchall()]
-                cursor.execute("SELECT * FROM codigos_parada ORDER BY tipo_maquina, numero ASC;"); dados["paradas"] = [dict(x) for x in cursor.fetchall()]
-                cursor.execute("SELECT * FROM tipos_tno ORDER BY nome ASC;"); dados["tnos"] = [dict(x) for x in cursor.fetchall()]
-                cursor.execute("SELECT * FROM maquinas ORDER BY numero_maquina ASC;"); dados["maquinas"] = [dict(x) for x in cursor.fetchall()]
-                cursor.execute("SELECT id, login, nome, nivel FROM usuarios WHERE login != 'admin' ORDER BY nome ASC;"); dados["usuarios"] = [dict(x) for x in cursor.fetchall()]
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        dados = {}
+        cursor.execute("SELECT * FROM master_sku ORDER BY codigo_sku ASC;"); dados["skus"] = cursor.fetchall()
+        cursor.execute("SELECT * FROM codigos_parada ORDER BY tipo_maquina, numero ASC;"); dados["paradas"] = cursor.fetchall()
+        cursor.execute("SELECT * FROM tipos_tno ORDER BY nome ASC;"); dados["tnos"] = cursor.fetchall()
+        cursor.execute("SELECT * FROM maquinas ORDER BY numero_maquina ASC;"); dados["maquinas"] = cursor.fetchall()
+        cursor.execute("SELECT id, login, nome, nivel FROM usuarios WHERE login != 'admin' ORDER BY nome ASC;"); dados["usuarios"] = cursor.fetchall()
+        cursor.close()
         return dados
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: conn.close()
 
 def processar_apontamento(dados: PayloadApontamento, cursor, turno_id=None):
     cargas = {1: 455, 2: 440, 3: 415}
@@ -125,7 +114,7 @@ def processar_apontamento(dados: PayloadApontamento, cursor, turno_id=None):
     soma_tno = sum(t.tempo_tno for o in dados.ordens for t in o.tnos)
     soma_paradas = sum(p.minutos_parados for p in dados.paradas)
 
-    if (soma_hp + soma_tno) != tempo_turno: raise HTTPException(status_code=400, detail=f"Soma HP ({soma_hp}m) + TNO ({soma_tno}m) deve fechar em {tempo_turno}m.")
+    if (soma_hp + soma_tno) != tempo_turno: raise HTTPException(status_code=400, detail=f"Soma HP ({soma_hp}m) + TNO ({soma_tno}m) não fechou {tempo_turno}m.")
     if (soma_hp - soma_rt) != soma_paradas: raise HTTPException(status_code=400, detail="Inconsistência nas paradas.")
 
     if turno_id:
@@ -147,118 +136,156 @@ def processar_apontamento(dados: PayloadApontamento, cursor, turno_id=None):
         
         cursor.execute("INSERT INTO result_by_order (turno_id, ordem, codigo_sku, horario_padrao, run_time, machine_counter, pallets, fardos_avulsos, total_pecas_estoque, taxa_movimentacao, taxa_loss) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id;", (turno_id, o.ordem, o.codigo_sku, o.horario_padrao, o.run_time, o.machine_counter, o.pallets, o.fardos_avulsos, total_pecas, taxa_mov, taxa_loss))
         ordem_id = cursor.fetchone()[0]
-        for t in o.tnos: cursor.execute("INSERT INTO ordem_tno (ordem_id, tipo_tno, tempo_tno) VALUES (%s, %s, %s);", (ordem_id, t.tipo_tno, t.tempo_tno))
-    for p in dados.paradas: cursor.execute("INSERT INTO stop_machine_item (turno_id, numero_parada, minutos_parados) VALUES (%s, %s, %s);", (turno_id, p.numero_parada, p.minutos_parados))
+        for t in o.tnos:
+            if t.tipo_tno: cursor.execute("INSERT INTO ordem_tno (ordem_id, tipo_tno, tempo_tno) VALUES (%s, %s, %s);", (ordem_id, t.tipo_tno, t.tempo_tno))
+    
+    for p in dados.paradas:
+        cursor.execute("INSERT INTO stop_machine_item (turno_id, numero_parada, minutos_parados) VALUES (%s, %s, %s);", (turno_id, p.numero_parada, p.minutos_parados))
 
 @app.post("/apontamentos")
 def criar_apontamento(dados: PayloadApontamento):
+    conn = None
     try:
-        with psycopg2.connect(DATABASE_URL) as conn:
-            with conn.cursor() as cursor: processar_apontamento(dados, cursor); conn.commit()
-            return {"status": "sucesso"}
-    except HTTPException as h: raise h
-    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        processar_apontamento(dados, cursor)
+        conn.commit()
+        cursor.close()
+        return {"status": "sucesso"}
+    except HTTPException as h:
+        if conn: conn.rollback()
+        raise h
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: conn.close()
 
 @app.put("/apontamentos/{id}")
 def atualizar_apontamento(id: int, dados: PayloadApontamento):
+    conn = None
     try:
-        with psycopg2.connect(DATABASE_URL) as conn:
-            with conn.cursor() as cursor: processar_apontamento(dados, cursor, turno_id=id); conn.commit()
-            return {"status": "sucesso"}
-    except HTTPException as h: raise h
-    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        processar_apontamento(dados, cursor, turno_id=id)
+        conn.commit()
+        cursor.close()
+        return {"status": "sucesso"}
+    except HTTPException as h:
+        if conn: conn.rollback()
+        raise h
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: conn.close()
 
 @app.get("/apontamentos")
 def listar_lancamentos(data: str = None, turno: str = None, maquina: str = None, ordem: str = None):
+    conn = None
     try:
-        with psycopg2.connect(DATABASE_URL) as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                query = "SELECT r.id, r.data_registro::text, r.turno, r.operador, r.maquina_numero, (SELECT COALESCE(SUM(machine_counter),0) FROM result_by_order WHERE turno_id = r.id) as total_mc FROM registro_turnos r WHERE 1=1 "
-                params = []
-                if data: query += "AND r.data_registro = %s "; params.append(data)
-                if turno: query += "AND r.turno = %s "; params.append(turno)
-                if maquina: query += "AND r.maquina_numero = %s "; params.append(maquina)
-                if ordem: query += "AND EXISTS (SELECT 1 FROM result_by_order WHERE turno_id = r.id AND ordem ILIKE %s) "; params.append(f"%{ordem}%")
-                query += "ORDER BY r.data_registro DESC, r.turno ASC LIMIT 100;"
-                cursor.execute(query, tuple(params))
-                return [dict(x) for x in cursor.fetchall()]
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        query = "SELECT r.id, r.data_registro::text, r.turno, r.operador, r.maquina_numero, (SELECT COALESCE(SUM(machine_counter),0) FROM result_by_order WHERE turno_id = r.id) as total_mc FROM registro_turnos r WHERE 1=1 "
+        params = []
+        if data: query += "AND r.data_registro = %s "; params.append(data)
+        if turno: query += "AND r.turno = %s "; params.append(turno)
+        if maquina: query += "AND r.maquina_numero = %s "; params.append(maquina)
+        if ordem: query += "AND EXISTS (SELECT 1 FROM result_by_order WHERE turno_id = r.id AND ordem ILIKE %s) "; params.append(f"%{ordem}%")
+        query += "ORDER BY r.data_registro DESC, r.turno ASC LIMIT 100;"
+        cursor.execute(query, tuple(params))
+        res = cursor.fetchall()
+        cursor.close()
+        return res
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: conn.close()
 
-# ROTA DE EDIÇÃO CORRIGIDA (Causa Raiz do Bug Resolvida)
 @app.get("/apontamentos/{id}")
 def obter_lancamento_completo(id: int):
+    conn = None
     try:
-        with psycopg2.connect(DATABASE_URL) as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute("SELECT id, data_registro::text, turno, operador, maquina_numero as maquina FROM registro_turnos WHERE id = %s;", (id,))
-                row = cursor.fetchone()
-                if not row: raise HTTPException(status_code=404, detail="Turno não encontrado.")
-                
-                turno = dict(row)
-                
-                cursor.execute("SELECT id, ordem, codigo_sku, horario_padrao, run_time, machine_counter, pallets, fardos_avulsos FROM result_by_order WHERE turno_id = %s;", (id,))
-                ordens = cursor.fetchall()
-                
-                lista_ordens = []
-                for o in ordens:
-                    od = dict(o)
-                    cursor.execute("SELECT tipo_tno, tempo_tno FROM ordem_tno WHERE ordem_id = %s;", (od['id'],))
-                    od['tnos'] = [dict(t) for t in cursor.fetchall()]
-                    lista_ordens.append(od)
-                
-                cursor.execute("SELECT numero_parada, minutos_parados FROM stop_machine_item WHERE turno_id = %s;", (id,))
-                paradas = cursor.fetchall()
-                
-                turno['ordens'] = lista_ordens
-                turno['paradas'] = [dict(p) for p in paradas]
-                return turno
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("SELECT id, data_registro::text, turno, operador, maquina_numero as maquina FROM registro_turnos WHERE id = %s;", (id,))
+        turno = cursor.fetchone()
+        if not turno: raise HTTPException(status_code=404, detail="Turno não encontrado")
+        
+        cursor.execute("SELECT id, ordem, codigo_sku, horario_padrao, run_time, machine_counter, pallets, fardos_avulsos FROM result_by_order WHERE turno_id = %s;", (id,))
+        ordens = cursor.fetchall()
+        
+        lista_ordens = []
+        for o in ordens:
+            od = dict(o)
+            cursor.execute("SELECT tipo_tno, tempo_tno FROM ordem_tno WHERE ordem_id = %s;", (od['id'],))
+            od['tnos'] = cursor.fetchall()
+            lista_ordens.append(od)
+            
+        cursor.execute("SELECT numero_parada, minutos_parados FROM stop_machine_item WHERE turno_id = %s;", (id,))
+        paradas = cursor.fetchall()
+        
+        turno['ordens'] = lista_ordens
+        turno['paradas'] = paradas
+        cursor.close()
+        return turno
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: conn.close()
 
 @app.delete("/apontamentos/{id}")
 def deletar_lancamento(id: int):
+    conn = None
     try:
-        with psycopg2.connect(DATABASE_URL) as conn:
-            with conn.cursor() as cursor: cursor.execute("DELETE FROM registro_turnos WHERE id = %s;", (id,)); conn.commit()
-            return {"status": "removido"}
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM registro_turnos WHERE id = %s;", (id,))
+        conn.commit()
+        cursor.close()
+        return {"status": "removido"}
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: conn.close()
 
 @app.get("/visao-ordens")
 def visao_ordens():
+    conn = None
     try:
-        with psycopg2.connect(DATABASE_URL) as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-                cursor.execute("""
-                    SELECT ro.ordem, MAX(rt.maquina_numero) as maquina, ro.codigo_sku, 
-                    SUM(ro.machine_counter) as total_mc, SUM(ro.total_pecas_estoque) as pecas_estoque, 
-                    SUM(ro.horario_padrao) as hp_total, SUM(ro.run_time) as rt_total, 
-                    SUM(ro.pallets) as pallets, SUM(ro.fardos_avulsos) as fardos_avulsos,
-                    MAX(s.fardos_por_pallet) as fat_pallet
-                    FROM result_by_order ro
-                    JOIN registro_turnos rt ON ro.turno_id = rt.id
-                    JOIN master_sku s ON ro.codigo_sku = s.codigo_sku
-                    GROUP BY ro.ordem, ro.codigo_sku ORDER BY ro.ordem DESC LIMIT 100;
-                """)
-                linhas = cursor.fetchall()
-                
-                retorno = []
-                for l in linhas: 
-                    ld = dict(l)
-                    fat = ld['fat_pallet'] if ld['fat_pallet'] else 0
-                    ld['total_fardos_calculado'] = (ld['pallets'] * fat) + ld['fardos_avulsos']
-                    retorno.append(ld)
-                return retorno
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("""
+            SELECT ro.ordem, MAX(rt.maquina_numero) as maquina, ro.codigo_sku, 
+            SUM(ro.machine_counter) as total_mc, SUM(ro.total_pecas_estoque) as pecas_estoque, 
+            SUM(ro.horario_padrao) as hp_total, SUM(ro.run_time) as rt_total, 
+            SUM(ro.pallets) as pallets, SUM(ro.fardos_avulsos) as fardos_avulsos,
+            MAX(s.fardos_por_pallet) as fat_pallet
+            FROM result_by_order ro
+            JOIN registro_turnos rt ON ro.turno_id = rt.id
+            JOIN master_sku s ON ro.codigo_sku = s.codigo_sku
+            GROUP BY ro.ordem, ro.codigo_sku ORDER BY ro.ordem DESC LIMIT 100;
+        """)
+        linhas = cursor.fetchall()
+        for l in linhas: l['total_fardos_calculado'] = (l['pallets'] * l['fat_pallet']) + l['fardos_avulsos']
+        cursor.close()
+        return linhas
     except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: conn.close()
 
-# ================= ROTAS DE EDIÇÃO MASTER =================
 def db_execute(query, params=None):
+    conn = None
     try:
-        with psycopg2.connect(DATABASE_URL) as conn:
-            with conn.cursor() as c: 
-                if params: c.execute(query, params)
-                else: c.execute(query)
-                conn.commit()
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        if params: cursor.execute(query, params)
+        else: cursor.execute(query)
+        conn.commit()
+        cursor.close()
         return {"status": "sucesso"}
-    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: conn.close()
 
 @app.post("/admin/maquinas")
 def c_m(m: ModelMaquina): return db_execute("INSERT INTO maquinas (numero_maquina, tipo, ativo) VALUES (%s, %s, %s);", (m.numero_maquina, m.tipo, m.ativo))
