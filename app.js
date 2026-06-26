@@ -4,7 +4,7 @@ let usuarioLogado = null;
 let MESTRE_SKUS = [], MESTRE_PARADAS = [], MESTRE_TNOS = [], MESTRE_MAQUINAS = [], MESTRE_USUARIOS = [];
 let contadorOrdens = 0, contadorParadas = 0, contadorTnos = 0;
 let editandoTurnoId = null;
-let dadosTotvs = {}; // Dicionário que cruza o arquivo do TOTVS
+let dadosTotvs = {}; 
 
 async function executarLogin() {
     const login = document.getElementById('login-usuario').value.trim();
@@ -65,18 +65,26 @@ async function inicializarPainel() {
 }
 
 async function baixarDadosMestres() {
-    try {
-        const res = await fetch(`${API_URL}/dados-mestres`);
-        if (res.ok) {
-            const data = await res.json();
-            MESTRE_SKUS = data.skus || [];
-            MESTRE_PARADAS = data.paradas || [];
-            MESTRE_TNOS = data.tnos || [];
-            MESTRE_MAQUINAS = data.maquinas || [];
-            MESTRE_USUARIOS = data.usuarios || [];
-            return;
+    let tentativas = 0;
+    while (tentativas < 3) {
+        try {
+            const res = await fetch(`${API_URL}/dados-mestres`);
+            if (res.ok) {
+                const data = await res.json();
+                MESTRE_SKUS = data.skus || [];
+                MESTRE_PARADAS = data.paradas || [];
+                MESTRE_TNOS = data.tnos || [];
+                MESTRE_MAQUINAS = data.maquinas || [];
+                MESTRE_USUARIOS = data.usuarios || [];
+                return;
+            }
+        } catch (e) {
+            console.warn("Tentativa de carregar dados falhou. Retentando em segundo plano...");
         }
-    } catch (e) { console.error("Erro ao sincronizar dados", e); }
+        tentativas++;
+        await new Promise(r => setTimeout(r, 1500));
+    }
+    console.error("Falha ao sincronizar dados mestres com o servidor.");
 }
 
 function navegarPara(idAba) {
@@ -95,17 +103,11 @@ function navegarPara(idAba) {
 }
 
 function abrirModal(id) {
-    const modal = document.getElementById(id);
-    if(modal) modal.classList.remove('escondido');
-    
+    document.getElementById(id).classList.remove('escondido');
     const inputs = document.getElementById(id).querySelectorAll('input');
     inputs.forEach(i => i.type !== 'hidden' ? i.value = '' : null);
 }
-
-function fecharModal(id) { 
-    const modal = document.getElementById(id);
-    if(modal) modal.classList.add('escondido'); 
-}
+function fecharModal(id) { document.getElementById(id).classList.add('escondido'); }
 
 function preencherSeletoresIniciais() {
     const selMq = document.getElementById('ap-maquina');
@@ -156,7 +158,7 @@ function adicionarOrdem() {
             <div class="grid-3">
                 <div class="form-group"><label>Counter (Peças):</label><input type="number" class="op-mc" value="0" oninput="calcularResumo()"></div>
                 <div class="form-group"><label>Pallets:</label><input type="number" class="op-pallets" value="0" oninput="calcularResumo()"></div>
-                <div class="form-group"><label>Fardos Av.:</label><input type="number" class="op-fardos" value="0" oninput="calcularResumo()"></div>
+                <div class="form-group"><label>Fardos Avulsos:</label><input type="number" class="op-fardos" value="0" oninput="calcularResumo()"></div>
             </div>
             
             <div style="background: rgba(0,0,0,0.2); padding: 10px; border-radius: 10px; margin-top: 10px;">
@@ -350,7 +352,7 @@ async function enviarApontamento() {
         } else {
             const err = await res.json(); alert(`Atenção: ${err.detail}`);
         }
-    } catch(e) { alert("Erro de rede. Verifique sua conexão."); }
+    } catch(e) { alert("Erro de rede ao salvar apontamento."); }
     finally { 
         if(btn) { btn.innerText = editandoTurnoId ? "Atualizar Turno" : "Gravar Apontamento"; }
         calcularResumo(); 
@@ -393,7 +395,7 @@ async function filtrarLancamentos() {
                 <div class="item-list">
                     <div>
                         <strong style="color:var(--accent-blue);">Turno ${l.turno} - Data: ${l.data_registro.split('-').reverse().join('/')}</strong><br>
-                        <span style="font-size:12px; color:var(--text-muted);">Mák: ${l.maquina_numero} | Op: ${l.operador} | Total MC: ${parseFloat(l.total_mc).toLocaleString()}</span>
+                        <span style="font-size:12px; color:var(--text-muted);">Máq: ${l.maquina_numero} | Op: ${l.operador} | Total MC: ${parseFloat(l.total_mc).toLocaleString()}</span>
                     </div>
                     <div>
                         <button class="btn-small-edit" onclick="carregarParaEdicao(${l.id})">Editar</button>
@@ -510,7 +512,6 @@ function processarTotvs() {
                 let qtde = parseFloat(cols[idxQtde]) || 0;
                 
                 if (loteSujo) {
-                    // REGRA DE OURO UNICHARM: Tira o 01001 final e arranca os zeros do começo
                     let loteLimpo = loteSujo;
                     if(loteSujo.length > 5) {
                         loteLimpo = parseInt(loteSujo.slice(0, -5), 10).toString();
@@ -556,7 +557,7 @@ async function carregarVisaoOP() {
                 return `
                 <tr>
                     <td><strong>${o.ordem}</strong></td>
-                    <td><span class="badge-blue">M${o.maquina}</span></td>
+                    <td><span class="badge-blue">Máq ${o.maquina}</span></td>
                     <td>${o.codigo_sku}</td>
                     <td><strong>${fardosApp}</strong></td>
                     <td>${fardosTotvsHTML}</td>
@@ -580,7 +581,7 @@ function renderizarGestao() {
     const boxMqs = document.getElementById('lista-admin-maquinas');
     if(boxMqs) {
         boxMqs.innerHTML = MESTRE_MAQUINAS.map(m => `
-            <div class="item-list"><div><strong>Mák ${m.numero_maquina}</strong> - ${m.tipo} ${!m.ativo ? '<span style="color:var(--danger-color);">(Inativa)</span>' : ''}</div>
+            <div class="item-list"><div><strong>Máq ${m.numero_maquina}</strong> - ${m.tipo} ${!m.ativo ? '<span style="color:var(--danger-color);">(Inativa)</span>' : ''}</div>
             <div><button class="btn-small-edit" onclick="preencherEdicao('maq', ${m.id})">Editar</button></div></div>`).join('');
     }
 
