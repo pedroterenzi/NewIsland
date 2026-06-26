@@ -4,6 +4,7 @@ let usuarioLogado = null;
 let MESTRE_SKUS = [], MESTRE_PARADAS = [], MESTRE_TNOS = [], MESTRE_MAQUINAS = [], MESTRE_USUARIOS = [];
 let contadorOrdens = 0, contadorParadas = 0, contadorTnos = 0;
 let editandoTurnoId = null;
+let dadosTotvs = {}; // Variável global para armazenar a planilha lida
 
 async function executarLogin() {
     const login = document.getElementById('login-usuario').value.trim();
@@ -11,45 +12,57 @@ async function executarLogin() {
     if (!login || !senha) return alert("Insira suas credenciais.");
     
     const btn = document.getElementById('btn-entrar'); 
-    btn.innerText = "Conectando ao banco..."; 
-    btn.disabled = true;
+    btn.innerText = "Conectando ao banco... (pode levar 50s)"; btn.disabled = true;
 
-    try {
-        const res = await fetch(`${API_URL}/usuarios/auth`, {
-            method: 'POST', 
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ login, senha })
-        });
-        
-        if (res.ok) {
-            usuarioLogado = await res.json();
-            btn.innerText = "Sincronizando Dados...";
-            
-            const dadosCarregados = await baixarDadosMestres();
-            if(dadosCarregados) {
-                inicializarPainel();
+    let tentativas = 0;
+    while(tentativas < 2) {
+        try {
+            const res = await fetch(`${API_URL}/usuarios/auth`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ login, senha })
+            });
+            if (res.ok) {
+                usuarioLogado = await res.json();
+                await inicializarPainel();
+                return;
             } else {
-                alert("Falha ao sincronizar o catálogo com a nuvem. O Render pode estar reiniciando. Aguarde alguns segundos e tente o login novamente.");
-                btn.innerText = "Entrar no Sistema"; 
-                btn.disabled = false;
+                alert("Credenciais incorretas.");
+                btn.innerText = "Entrar no Sistema"; btn.disabled = false;
+                return;
             }
-        } else {
-            alert("Credenciais incorretas.");
-            btn.innerText = "Entrar no Sistema"; 
-            btn.disabled = false;
+        } catch (e) {
+            tentativas++;
+            if(tentativas >= 2) {
+                alert("Erro de conexão persistente. Verifique sua internet ou tente novamente.");
+            } else {
+                await new Promise(r => setTimeout(r, 3000));
+            }
         }
-    } catch (e) {
-        alert("O servidor gratuito do Render está despertando. Aguarde 5 segundos e clique em Entrar novamente.");
-        btn.innerText = "Entrar no Sistema"; 
-        btn.disabled = false;
     }
+    btn.innerText = "Entrar no Sistema"; btn.disabled = false;
 }
 
 function sair() { location.reload(); }
 
+async function inicializarPainel() {
+    document.getElementById('tela-login').classList.add('escondido');
+    document.getElementById('menu-navegacao').classList.remove('escondido');
+    
+    document.getElementById('txt-user').innerText = `Operador: ${usuarioLogado.nome}`;
+    if (parseInt(usuarioLogado.nivel) >= 2) {
+        document.querySelectorAll('.restrito-lider-adm').forEach(el => el.classList.remove('escondido'));
+    }
+    const inputData = document.getElementById('ap-data');
+    if (inputData) inputData.value = new Date().toISOString().split('T')[0];
+
+    await baixarDadosMestres();
+    preencherSeletoresIniciais();
+    navegarPara('operador');
+}
+
 async function baixarDadosMestres() {
     let tentativas = 0;
-    while(tentativas < 3) {
+    while (tentativas < 3) {
         try {
             const res = await fetch(`${API_URL}/dados-mestres`);
             if (res.ok) {
@@ -59,34 +72,18 @@ async function baixarDadosMestres() {
                 MESTRE_TNOS = data.tnos || [];
                 MESTRE_MAQUINAS = data.maquinas || [];
                 MESTRE_USUARIOS = data.usuarios || [];
-                return true; 
+                return;
             }
         } catch (e) {
-            console.log("Tentando contato com banco...");
+            console.warn("Tentativa de carregar dados falhou. Retentando em segundo plano...");
         }
         tentativas++;
         await new Promise(r => setTimeout(r, 1500));
     }
-    return false;
+    console.error("Falha ao sincronizar dados mestres com o servidor.");
 }
 
-function inicializarPainel() {
-    document.getElementById('tela-login').classList.add('escondido');
-    document.getElementById('menu-navegacao').classList.remove('escondido');
-    
-    document.getElementById('txt-user').innerText = `Operador: ${usuarioLogado.nome}`;
-    if (parseInt(usuarioLogado.nivel) >= 2) {
-        document.querySelectorAll('.restrito-lider-adm').forEach(el => el.classList.remove('escondido'));
-    }
-    
-    const inputData = document.getElementById('ap-data');
-    if (inputData) inputData.value = new Date().toISOString().split('T')[0];
-
-    preencherSeletoresIniciais();
-    navegarPara('operador');
-}
-
-// CORREÇÃO: Blindagem Anti-Crash de Navegação
+// ================= NAVEGAÇÃO =================
 function navegarPara(idAba) {
     document.querySelectorAll('.aba-conteudo').forEach(el => el.classList.add('escondido'));
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('ativo'));
@@ -109,14 +106,13 @@ function abrirModal(id) {
 }
 function fecharModal(id) { document.getElementById(id).classList.add('escondido'); }
 
+// ================= TELA APONTAMENTO =================
 function preencherSeletoresIniciais() {
     const selMq = document.getElementById('ap-maquina');
-    const maqAtivas = MESTRE_MAQUINAS.filter(m => m.ativo);
-    
-    if (maqAtivas.length > 0) {
-        selMq.innerHTML = maqAtivas.map(m => `<option value="${m.numero_maquina}">Máquina ${m.numero_maquina} (${m.tipo==='baby_care'?'Baby':'Adulto'})</option>`).join('');
+    if (MESTRE_MAQUINAS.length > 0) {
+        selMq.innerHTML = MESTRE_MAQUINAS.filter(m => m.ativo).map(m => `<option value="${m.numero_maquina}">Máquina ${m.numero_maquina} (${m.tipo==='baby_care'?'Baby':'Adulto'})</option>`).join('');
     } else {
-        selMq.innerHTML = '<option value="">Sem máquinas cadastradas</option>';
+        selMq.innerHTML = '<option value="">Sem máquinas</option>';
     }
     
     document.getElementById('container-ordens').innerHTML = '';
@@ -165,7 +161,7 @@ function adicionarOrdem() {
             </div>
 
             <div style="font-size:13px; color:var(--success-color); font-weight:bold; margin-top:10px;" id="ordem-calc-${contadorOrdens}">Estoque: 0 | Mov: 0% | Loss: 0%</div>
-            <button class="btn-small-delete" onclick="removerItem('ordem-${contadorOrdens}')">Excluir Ordem</button>
+            <button class="btn-small-delete" style="margin-top:10px;" onclick="removerItem('ordem-${contadorOrdens}')">Excluir Ordem</button>
         </div>`;
     container.insertAdjacentHTML('beforeend', html);
     atualizarDescricaoSku(contadorOrdens);
@@ -345,6 +341,7 @@ function cancelarEdicaoApontamento() {
     adicionarOrdem();
 }
 
+// ================= TELA LANÇAMENTOS (FILTROS) =================
 async function filtrarLancamentos() {
     const data = document.getElementById('filtro-data').value;
     const turno = document.getElementById('filtro-turno').value;
@@ -444,28 +441,91 @@ async function carregarParaEdicao(id) {
     }
 }
 
+// ================= TELA VISÃO OP E VALIDAÇÃO TOTVS =================
+function processarTotvs() {
+    const fileInput = document.getElementById('upload-totvs');
+    if (!fileInput.files.length) return alert("Selecione a planilha do TOTVS primeiro.");
+    
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+    
+    reader.onload = function(e) {
+        const text = e.target.result;
+        const lines = text.split('\n');
+        if (lines.length < 2) return alert("Planilha vazia ou formato inválido.");
+        
+        const headers = lines[0].split(',');
+        let idxLote = -1;
+        let idxQtde = -1;
+        
+        headers.forEach((h, i) => {
+            const headerLimp = h.trim().toLowerCase();
+            if (headerLimp.includes('lote')) idxLote = i;
+            if (headerLimp.includes('qtde') || headerLimp.includes('quantidade')) idxQtde = i;
+        });
+        
+        if (idxLote === -1 || idxQtde === -1) {
+            return alert("Não foi possível encontrar as colunas 'Lote' e/ou 'Qtde Apontada' na planilha.");
+        }
+        
+        dadosTotvs = {};
+        for (let i = 1; i < lines.length; i++) {
+            const cols = lines[i].split(',');
+            if (cols.length > Math.max(idxLote, idxQtde)) {
+                const lote = cols[idxLote].trim();
+                const qtde = parseFloat(cols[idxQtde]) || 0;
+                if (lote) {
+                    dadosTotvs[lote] = (dadosTotvs[lote] || 0) + qtde;
+                }
+            }
+        }
+        
+        alert("Planilha TOTVS processada! Verifique a coluna de Status de Validação.");
+        carregarVisaoOP(); // Recarrega a tabela aplicando a comparação
+    };
+    reader.readAsText(file);
+}
+
 async function carregarVisaoOP() {
     try {
         const res = await fetch(`${API_URL}/visao-ordens`);
         if(res.ok) {
             const ordens = await res.json();
             const tbody = document.querySelector('#tabela-visao-op tbody');
-            tbody.innerHTML = ordens.map(o => `
+            tbody.innerHTML = ordens.map(o => {
+                const fardosApp = parseFloat(o.total_fardos_calculado) || 0;
+                let fardosTotvsHTML = `<span style="color:var(--text-muted); font-size: 11px;">Aguardando CSV...</span>`;
+                let statusHTML = `<span class="badge-blue">Pendente</span>`;
+                
+                // Se o usuário importou a planilha, faz a mágica da comparação!
+                if (Object.keys(dadosTotvs).length > 0) {
+                    const fardosTotvs = dadosTotvs[o.ordem] || 0;
+                    fardosTotvsHTML = `<strong>${fardosTotvs}</strong>`;
+                    
+                    if (fardosApp === fardosTotvs) {
+                        statusHTML = `<span class="badge-success">✔ Bateu</span>`;
+                    } else {
+                        statusHTML = `<span class="badge-danger">✖ Divergente</span>`;
+                    }
+                }
+
+                return `
                 <tr>
                     <td><strong>${o.ordem}</strong></td>
                     <td><span class="badge-blue">M${o.maquina}</span></td>
                     <td>${o.codigo_sku}</td>
+                    <td><strong>${fardosApp}</strong></td>
+                    <td>${fardosTotvsHTML}</td>
+                    <td>${statusHTML}</td>
                     <td><span class="badge-success">${parseFloat(o.pecas_estoque).toLocaleString()}</span></td>
-                    <td>${parseFloat(o.total_fardos_calculado).toLocaleString()}</td>
-                    <td>${o.hp_total}m</td>
-                    <td>${o.rt_total}m</td>
                     <td><span class="badge-danger">${o.total_mc > 0 ? (((o.total_mc - o.pecas_estoque)/o.total_mc)*100).toFixed(1) : 0}%</span></td>
                 </tr>
-            `).join('');
+            `}).join('');
         }
     } catch(e) {}
 }
 
+// ================= GESTÃO ADMIN (CRUD) =================
 function renderizarGestao() {
     document.getElementById('lista-admin-skus').innerHTML = MESTRE_SKUS.map(s => `
         <div class="item-list"><div><strong>${s.codigo_sku}</strong> - ${s.descricao}</div>
