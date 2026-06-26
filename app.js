@@ -11,10 +11,8 @@ async function executarLogin() {
     if (!login || !senha) return alert("Insira suas credenciais.");
     
     const btn = document.getElementById('btn-entrar'); 
-    btn.innerText = "Conectando..."; 
+    btn.innerText = "Conectando ao banco..."; 
     btn.disabled = true;
-
-    let loginSucesso = false;
 
     try {
         const res = await fetch(`${API_URL}/usuarios/auth`, {
@@ -25,18 +23,23 @@ async function executarLogin() {
         
         if (res.ok) {
             usuarioLogado = await res.json();
-            loginSucesso = true;
+            btn.innerText = "Sincronizando Dados...";
+            
+            const dadosCarregados = await baixarDadosMestres();
+            if(dadosCarregados) {
+                inicializarPainel();
+            } else {
+                alert("Falha ao sincronizar o catálogo com a nuvem. O Render pode estar reiniciando. Aguarde alguns segundos e tente o login novamente.");
+                btn.innerText = "Entrar no Sistema"; 
+                btn.disabled = false;
+            }
         } else {
             alert("Credenciais incorretas.");
+            btn.innerText = "Entrar no Sistema"; 
+            btn.disabled = false;
         }
     } catch (e) {
-        alert("O servidor está despertando. Aguarde 5 segundos e clique novamente.");
-    }
-
-    if (loginSucesso) {
-        btn.innerText = "Sincronizando Dados...";
-        await inicializarPainel();
-    } else {
+        alert("O servidor gratuito do Render está despertando. Aguarde 5 segundos e clique em Entrar novamente.");
         btn.innerText = "Entrar no Sistema"; 
         btn.disabled = false;
     }
@@ -44,7 +47,30 @@ async function executarLogin() {
 
 function sair() { location.reload(); }
 
-async function inicializarPainel() {
+async function baixarDadosMestres() {
+    let tentativas = 0;
+    while(tentativas < 3) {
+        try {
+            const res = await fetch(`${API_URL}/dados-mestres`);
+            if (res.ok) {
+                const data = await res.json();
+                MESTRE_SKUS = data.skus || [];
+                MESTRE_PARADAS = data.paradas || [];
+                MESTRE_TNOS = data.tnos || [];
+                MESTRE_MAQUINAS = data.maquinas || [];
+                MESTRE_USUARIOS = data.usuarios || [];
+                return true; 
+            }
+        } catch (e) {
+            console.log("Tentando contato com banco...");
+        }
+        tentativas++;
+        await new Promise(r => setTimeout(r, 1500));
+    }
+    return false;
+}
+
+function inicializarPainel() {
     document.getElementById('tela-login').classList.add('escondido');
     document.getElementById('menu-navegacao').classList.remove('escondido');
     
@@ -52,41 +78,24 @@ async function inicializarPainel() {
     if (parseInt(usuarioLogado.nivel) >= 2) {
         document.querySelectorAll('.restrito-lider-adm').forEach(el => el.classList.remove('escondido'));
     }
+    
     const inputData = document.getElementById('ap-data');
     if (inputData) inputData.value = new Date().toISOString().split('T')[0];
 
-    const sucesso = await baixarDadosMestres();
-    if (sucesso) {
-        preencherSeletoresIniciais();
-        navegarPara('operador');
-    } else {
-        alert("Falha ao baixar dados da Nuvem. O painel não funcionará corretamente. Recarregue a página.");
-    }
+    preencherSeletoresIniciais();
+    navegarPara('operador');
 }
 
-async function baixarDadosMestres() {
-    try {
-        const res = await fetch(`${API_URL}/dados-mestres`);
-        if (res.ok) {
-            const data = await res.json();
-            MESTRE_SKUS = data.skus || [];
-            MESTRE_PARADAS = data.paradas || [];
-            MESTRE_TNOS = data.tnos || [];
-            MESTRE_MAQUINAS = data.maquinas || [];
-            MESTRE_USUARIOS = data.usuarios || [];
-            return true;
-        }
-    } catch (e) { console.error("Erro dados mestres", e); }
-    return false;
-}
-
-// ================= NAVEGAÇÃO =================
+// CORREÇÃO: Blindagem Anti-Crash de Navegação
 function navegarPara(idAba) {
     document.querySelectorAll('.aba-conteudo').forEach(el => el.classList.add('escondido'));
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('ativo'));
     
-    document.getElementById(`tela-${idAba}`).classList.remove('escondido');
-    document.getElementById(`nav-${idAba}`).classList.add('ativo');
+    const tela = document.getElementById(`tela-${idAba}`);
+    const nav = document.getElementById(`nav-${idAba}`);
+    
+    if (tela) tela.classList.remove('escondido');
+    if (nav) nav.classList.add('ativo');
 
     if(idAba === 'admin') renderizarGestao();
     if(idAba === 'visao') carregarVisaoOP();
@@ -100,7 +109,6 @@ function abrirModal(id) {
 }
 function fecharModal(id) { document.getElementById(id).classList.add('escondido'); }
 
-// ================= TELA APONTAMENTO =================
 function preencherSeletoresIniciais() {
     const selMq = document.getElementById('ap-maquina');
     const maqAtivas = MESTRE_MAQUINAS.filter(m => m.ativo);
@@ -157,7 +165,7 @@ function adicionarOrdem() {
             </div>
 
             <div style="font-size:13px; color:var(--success-color); font-weight:bold; margin-top:10px;" id="ordem-calc-${contadorOrdens}">Estoque: 0 | Mov: 0% | Loss: 0%</div>
-            <button class="btn-small-delete" style="margin-top:10px;" onclick="removerItem('ordem-${contadorOrdens}')">Excluir Ordem</button>
+            <button class="btn-small-delete" onclick="removerItem('ordem-${contadorOrdens}')">Excluir Ordem</button>
         </div>`;
     container.insertAdjacentHTML('beforeend', html);
     atualizarDescricaoSku(contadorOrdens);
@@ -322,7 +330,7 @@ async function enviarApontamento() {
         } else {
             const err = await res.json(); alert(`Atenção: ${err.detail}`);
         }
-    } catch(e) { alert("Erro de rede ao salvar apontamento."); }
+    } catch(e) { alert("Erro de rede. Verifique sua conexão."); }
     finally { btn.innerText = editandoTurnoId ? "Atualizar Turno" : "Gravar Apontamento"; calcularResumo(); }
 }
 
@@ -337,7 +345,6 @@ function cancelarEdicaoApontamento() {
     adicionarOrdem();
 }
 
-// ================= TELA LANÇAMENTOS (FILTROS) =================
 async function filtrarLancamentos() {
     const data = document.getElementById('filtro-data').value;
     const turno = document.getElementById('filtro-turno').value;
@@ -430,12 +437,13 @@ async function carregarParaEdicao(id) {
             calcularResumo();
         } else {
             const err = await res.json();
-            alert(`Falha do servidor: ${err.detail}`);
+            alert(`Falha do servidor ao carregar turno: ${err.detail}`);
         }
-    } catch(e) { alert(`Erro fatal de carregamento: ${e.message}`); }
+    } catch(e) { 
+        alert("O servidor pode estar dormindo ou rejeitou a conexão. Tente novamente em alguns instantes."); 
+    }
 }
 
-// ================= TELA VISÃO OP =================
 async function carregarVisaoOP() {
     try {
         const res = await fetch(`${API_URL}/visao-ordens`);
@@ -458,7 +466,6 @@ async function carregarVisaoOP() {
     } catch(e) {}
 }
 
-// ================= GESTÃO ADMIN (CRUD) =================
 function renderizarGestao() {
     document.getElementById('lista-admin-skus').innerHTML = MESTRE_SKUS.map(s => `
         <div class="item-list"><div><strong>${s.codigo_sku}</strong> - ${s.descricao}</div>
