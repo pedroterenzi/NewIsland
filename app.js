@@ -53,9 +53,13 @@ async function inicializarPainel() {
     const txtUser = document.getElementById('txt-user');
     if (txtUser) txtUser.innerText = `Operador: ${usuarioLogado.nome}`;
     
+    // Mostra/Esconde as opções restritas com base no Nível
     if (parseInt(usuarioLogado.nivel) >= 2) {
         document.querySelectorAll('.restrito-lider-adm').forEach(el => el.classList.remove('escondido'));
+    } else {
+        document.querySelectorAll('.restrito-lider-adm').forEach(el => el.classList.add('escondido'));
     }
+
     const inputData = document.getElementById('ap-data');
     if (inputData) inputData.value = new Date().toISOString().split('T')[0];
 
@@ -88,6 +92,12 @@ async function baixarDadosMestres() {
 }
 
 function navegarPara(idAba) {
+    // BLINDAGEM LÓGICA: Se for operador (Nível 1) tentando acessar área restrita, bloqueia.
+    if (parseInt(usuarioLogado.nivel) < 2 && idAba !== 'operador') {
+        alert("Acesso Restrito: Apenas gestores podem acessar esta tela.");
+        return;
+    }
+
     document.querySelectorAll('.aba-conteudo').forEach(el => el.classList.add('escondido'));
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('ativo'));
     
@@ -102,16 +112,13 @@ function navegarPara(idAba) {
     if(idAba === 'lancamentos') filtrarLancamentos(); 
 }
 
-// CORREÇÃO MESTRA: A função de abrir modal agora reseta os títulos para o padrão
 function abrirModal(id) {
     const modal = document.getElementById(id);
     if(modal) modal.classList.remove('escondido');
     
-    // Limpa a sujeira dos campos toda vez que a janela abre
     const inputs = document.getElementById(id).querySelectorAll('input');
     inputs.forEach(i => i.type !== 'hidden' ? i.value = '' : null);
 
-    // Reseta o Título para Cadastro (Caso a pessoa abra direto no "+ Adicionar")
     const titulo = document.getElementById(id + '-titulo');
     if(titulo) {
         if(id === 'modal-sku') titulo.innerText = 'Cadastrar Produto';
@@ -625,7 +632,6 @@ function renderizarGestao() {
     }
 }
 
-// CORREÇÃO MESTRA: Primeiro abre o modal (que apaga os dados), DEPOIS preenche os dados
 function preencherEdicao(tipo, id) {
     if(tipo === 'sku') {
         abrirModal('modal-sku');
