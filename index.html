@@ -77,8 +77,7 @@
         .nav-inferior { 
             position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); 
             width: calc(100% - 32px); max-width: 500px; 
-            background: rgba(15, 23, 42, 0.85);
-            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(16px);
             border: 1px solid rgba(255,255,255,0.08); 
             display: flex; justify-content: space-between; align-items: center; 
             padding: 8px 16px; border-radius: 100px; 
@@ -205,7 +204,7 @@
     </div>
 
     <div id="tela-visao" class="escondido aba-conteudo">
-        <h2 style="text-align: left; margin-bottom: 8px;">Visão por OP (TOTVS)</h2>
+        <h2 style="text-align: left; margin-bottom: 8px;">Visão por OP & Validação TOTVS</h2>
         <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 24px; margin-top:0;">Acumulado de turnos para validação sistêmica.</p>
         
         <div class="card" style="margin-bottom: 20px;">
@@ -261,9 +260,9 @@
 
     <nav class="nav-inferior escondido" id="menu-navegacao">
         <button class="nav-item ativo" id="nav-operador" onclick="navegarPara('operador')"><div class="icon">📝</div>Apontar</button>
-        <button class="nav-item restrito-lider-adm" id="nav-lancamentos" onclick="navegarPara('lancamentos')"><div class="icon">🔎</div>Registros</button>
-        <button class="nav-item restrito-lider-adm" id="nav-visao" onclick="navegarPara('visao')"><div class="icon">📊</div>Visão OP</button>
-        <button class="nav-item restrito-lider-adm" id="nav-admin" onclick="navegarPara('admin')"><div class="icon">⚙️</div>Gestão</button>
+        <button class="nav-item restrito-lider-adm escondido" id="nav-lancamentos" onclick="navegarPara('lancamentos')"><div class="icon">🔎</div>Registros</button>
+        <button class="nav-item restrito-lider-adm escondido" id="nav-visao" onclick="navegarPara('visao')"><div class="icon">📊</div>Visão OP</button>
+        <button class="nav-item restrito-lider-adm escondido" id="nav-admin" onclick="navegarPara('admin')"><div class="icon">⚙️</div>Gestão</button>
         <button class="nav-item sair" onclick="sair()"><div class="icon">🚪</div>Sair</button>
     </nav>
 
@@ -326,7 +325,7 @@
         <div class="form-group"><label>Nome:</label><input type="text" id="form-u-nome"></div>
         <div class="form-group"><label>Login:</label><input type="text" id="form-u-login"></div>
         <div class="form-group"><label>Senha (Atualize p/ salvar):</label><input type="password" id="form-u-senha"></div>
-        <div class="form-group"><label>Acesso:</label><select id="form-u-nivel"><option value="1">Operador</option><option value="2">Liderança</option><option value="3">Admin</option></select></div>
+        <div class="form-group"><label>Acesso:</label><select id="form-u-nivel"><option value="1">Operador (Nível 1)</option><option value="2">Liderança (Nível 2)</option><option value="3">Admin (Nível 3)</option></select></div>
         <button class="btn-blue" onclick="salvarUsuario()" style="margin-top: 8px;">Salvar Colaborador</button>
         <button class="btn-dash" style="margin-top:12px; border-color:var(--text-muted); color:var(--text-muted);" onclick="fecharModal('modal-usuario')">Cancelar</button>
     </div>
