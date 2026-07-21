@@ -5,7 +5,7 @@ from typing import List, Optional
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
-app = FastAPI(title="API Controle de Materiais e Rastreabilidade")
+app = FastAPI(title="API Controle de Materiais e Rastreabilidade MP")
 
 app.add_middleware(
     CORSMiddleware,
@@ -85,7 +85,8 @@ def inicializar_banco():
                 operador VARCHAR(255) NOT NULL,
                 data_inicio TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 data_fim TIMESTAMP,
-                status VARCHAR(50) DEFAULT 'em_uso'
+                status VARCHAR(50) DEFAULT 'em_uso',
+                op_destino_transferencia VARCHAR(100)
             );
         """)
 
@@ -145,10 +146,22 @@ class ModelLoteEstoque(BaseModel):
     lote_fornecedor: str
     peso_inicial: float
 
-class ModelDevolucao(BaseModel):
+class ModelAbastecerConfirmar(BaseModel):
+    ordem_producao: str
+    maquina_numero: int
+    codigo_barras_lote: str
+    operador: str
+
+class ModelDevolucaoFisica(BaseModel):
     consumo_id: int
-    peso_balanca_bruto: float
-    novo_codigo_barras_sobra: str
+    peso_manual_kg: float
+    operador: str
+
+class ModelDevolucaoSistemica(BaseModel):
+    consumo_id: int
+    nova_ordem_destino: str
+    peso_transferido_kg: float
+    operador: str
 
 class ModelRefugo(BaseModel):
     ordem_producao: str
@@ -157,7 +170,7 @@ class ModelRefugo(BaseModel):
     tipo_refugo: str
     operador: str
 
-# --- ROTAS DE AUTENTICAÇÃO E MESTRES ---
+# --- AUTENTICAÇÃO E MESTRES ---
 @app.post("/usuarios/auth")
 def autenticar(obj: ModelAuth):
     login = obj.login.strip().lower()
@@ -203,33 +216,90 @@ def obter_dados_mestres():
         if conn:
             conn.close()
 
-# --- ROTAS OPERACIONAIS (ABASTECER, DEVOLVER, REFUGO) ---
+# --- CONSULTA E PRÉ-VISUALIZAÇÃO DE BARRAS ---
+
+@app.get("/lotes/consultar/{codigo_barras}")
+def consultar_lote_para_abastecer(codigo_barras: str):
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("""
+            SELECT l.codigo_barras_lote, l.codigo_material, l.lote_fornecedor, l.peso_atual, l.status, m.descricao, m.tipo_material
+            FROM lotes_estoque l
+            JOIN master_materiais m ON l.codigo_material = m.codigo_material
+            WHERE l.codigo_barras_lote = %s;
+        """, (codigo_barras.strip(),))
+        lote = cursor.fetchone()
+        cursor.close()
+        if not lote:
+            raise HTTPException(status_code=404, detail="Etiqueta / Lote não encontrado no sistema!")
+        if lote['status'] == 'consumido':
+            raise HTTPException(status_code=400, detail="Este lote já consta como totalmente consumido!")
+        if lote['status'] == 'em_linha':
+            raise HTTPException(status_code=400, detail="Este lote já está alocado em uma máquina!")
+            
+        return lote
+    except HTTPException as h:
+        raise h
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            conn.close()
+
+@app.get("/consumo/buscar-ativo/{codigo_barras}")
+def consultar_lote_ativo_para_devolver(codigo_barras: str):
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("""
+            SELECT c.id as consumo_id, c.ordem_producao, c.maquina_numero, c.peso_alocado, c.codigo_barras_lote,
+                   l.codigo_material, m.descricao, m.peso_tubete_padrao, l.lote_fornecedor
+            FROM consumo_op_lote c
+            JOIN lotes_estoque l ON c.codigo_barras_lote = l.codigo_barras_lote
+            JOIN master_materiais m ON l.codigo_material = m.codigo_material
+            WHERE c.codigo_barras_lote = %s AND c.status = 'em_uso';
+        """, (codigo_barras.strip(),))
+        consumo = cursor.fetchone()
+        cursor.close()
+        if not consumo:
+            raise HTTPException(status_code=404, detail="Esta etiqueta não está atualmente apontada em nenhuma OP ativa!")
+            
+        return consumo
+    except HTTPException as h:
+        raise h
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            conn.close()
+
+# --- OPERAÇÕES: ABASTECER, DEVOLVER FÍSICO E DEVOLVER SISTÊMICO ---
 
 @app.post("/consumo/abastecer")
-def abastecer_linha(ordem_producao: str, maquina_numero: int, codigo_barras_lote: str, operador: str):
+def confirmar_abastecimento(obj: ModelAbastecerConfirmar):
     conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         
-        # 1. Verifica se o lote existe e se está disponível
-        cursor.execute("SELECT * FROM lotes_estoque WHERE codigo_barras_lote = %s AND status != 'consumido';", (codigo_barras_lote,))
+        cursor.execute("SELECT * FROM lotes_estoque WHERE codigo_barras_lote = %s AND status = 'em_estoque';", (obj.codigo_barras_lote.strip(),))
         lote = cursor.fetchone()
         if not lote:
-            raise HTTPException(status_code=404, detail="Lote/Bobina não encontrado no estoque ou já consumido!")
+            raise HTTPException(status_code=400, detail="Lote não disponível para abastecimento.")
 
-        # 2. Insere a alocação na OP
         cursor.execute("""
             INSERT INTO consumo_op_lote (ordem_producao, maquina_numero, codigo_barras_lote, peso_alocado, operador)
             VALUES (%s, %s, %s, %s, %s) RETURNING id;
-        """, (ordem_producao, maquina_numero, codigo_barras_lote, lote['peso_atual'], operador))
+        """, (obj.ordem_producao.strip(), obj.maquina_numero, obj.codigo_barras_lote.strip(), lote['peso_atual'], obj.operador))
         
-        # 3. Atualiza o status do lote no estoque
-        cursor.execute("UPDATE lotes_estoque SET status = 'em_linha' WHERE codigo_barras_lote = %s;", (codigo_barras_lote,))
+        cursor.execute("UPDATE lotes_estoque SET status = 'em_linha' WHERE codigo_barras_lote = %s;", (obj.codigo_barras_lote.strip(),))
         
         conn.commit()
         cursor.close()
-        return {"status": "sucesso", "mensagem": f"Lote {lote['lote_fornecedor']} ({lote['peso_atual']}kg) carregado na OP {ordem_producao}!"}
+        return {"status": "sucesso", "mensagem": "Abastecimento gravado com sucesso!"}
     except HTTPException as h:
         if conn: conn.rollback()
         raise h
@@ -239,40 +309,8 @@ def abastecer_linha(ordem_producao: str, maquina_numero: int, codigo_barras_lote
     finally:
         if conn: conn.close()
 
-@app.get("/consumo/em-uso")
-def listar_lotes_em_uso(ordem: str = None, maquina: int = None):
-    conn = None
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
-        query = """
-            SELECT c.id, c.ordem_producao, c.maquina_numero, c.codigo_barras_lote, c.peso_alocado, 
-                   c.operador, c.data_inicio::text, l.codigo_material, m.descricao as material_descricao, l.lote_fornecedor
-            FROM consumo_op_lote c
-            JOIN lotes_estoque l ON c.codigo_barras_lote = l.codigo_barras_lote
-            JOIN master_materiais m ON l.codigo_material = m.codigo_material
-            WHERE c.status = 'em_uso'
-        """
-        params = []
-        if ordem:
-            query += " AND c.ordem_producao ILIKE %s"
-            params.append(f"%{ordem}%")
-        if maquina:
-            query += " AND c.maquina_numero = %s"
-            params.append(maquina)
-            
-        query += " ORDER BY c.id DESC;"
-        cursor.execute(query, tuple(params))
-        res = cursor.fetchall()
-        cursor.close()
-        return res
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if conn: conn.close()
-
-@app.post("/consumo/devolver")
-def devolver_sobra(obj: ModelDevolucao):
+@app.post("/consumo/devolver-fisico")
+def devolver_sobra_fisica(obj: ModelDevolucaoFisica):
     conn = None
     try:
         conn = get_db_connection()
@@ -288,10 +326,10 @@ def devolver_sobra(obj: ModelDevolucao):
         consumo = cursor.fetchone()
         
         if not consumo:
-            raise HTTPException(status_code=404, detail="Apontamento de uso não encontrado ou já finalizado.")
+            raise HTTPException(status_code=404, detail="Apontamento de uso não encontrado.")
             
         peso_tubete = float(consumo['peso_tubete_padrao'])
-        sobra_liquida = float(obj.peso_balanca_bruto) - peso_tubete
+        sobra_liquida = float(obj.peso_manual_kg) - peso_tubete
         if sobra_liquida < 0:
             sobra_liquida = 0.0
             
@@ -302,25 +340,77 @@ def devolver_sobra(obj: ModelDevolucao):
 
         cursor.execute("""
             UPDATE consumo_op_lote 
-            SET peso_devolvido = %s, consumo_real = %s, status = 'finalizado', data_fim = CURRENT_TIMESTAMP
+            SET peso_devolvido = %s, consumo_real = %s, status = 'devolvido_estoque', data_fim = CURRENT_TIMESTAMP
             WHERE id = %s;
         """, (sobra_liquida, consumo_real, obj.consumo_id))
 
-        cursor.execute("UPDATE lotes_estoque SET status = 'consumido' WHERE codigo_barras_lote = %s;", (consumo['codigo_barras_lote'],))
-
         if sobra_liquida > 0:
-            cursor.execute("""
-                INSERT INTO lotes_estoque (codigo_barras_lote, codigo_material, lote_fornecedor, peso_inicial, peso_atual, status)
-                VALUES (%s, %s, %s, %s, %s, 'em_estoque');
-            """, (obj.novo_codigo_barras_sobra, consumo['codigo_material'], consumo['lote_fornecedor'] + "-SOBRA", sobra_liquida, sobra_liquida))
+            cursor.execute("UPDATE lotes_estoque SET peso_atual = %s, status = 'em_estoque' WHERE codigo_barras_lote = %s;", 
+                           (sobra_liquida, consumo['codigo_barras_lote']))
+        else:
+            cursor.execute("UPDATE lotes_estoque SET peso_atual = 0, status = 'consumido' WHERE codigo_barras_lote = %s;", 
+                           (consumo['codigo_barras_lote'],))
 
         conn.commit()
         cursor.close()
         return {
             "status": "sucesso", 
-            "consumo_real_kg": consumo_real, 
-            "sobra_liquida_kg": sobra_liquida,
-            "nova_etiqueta": obj.novo_codigo_barras_sobra
+            "consumo_real_op": consumo_real, 
+            "sobra_liquida_estoque": sobra_liquida
+        }
+    except HTTPException as h:
+        if conn: conn.rollback()
+        raise h
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: conn.close()
+
+@app.post("/consumo/transferir-op")
+def transferir_sistemico_op(obj: ModelDevolucaoSistemica):
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        cursor.execute("SELECT * FROM consumo_op_lote WHERE id = %s AND status = 'em_uso';", (obj.consumo_id,))
+        consumo_origem = cursor.fetchone()
+        
+        if not consumo_origem:
+            raise HTTPException(status_code=404, detail="Apontamento de origem não encontrado ou já baixado.")
+            
+        peso_alocado = float(consumo_origem['peso_alocado'])
+        peso_transferido = float(obj.peso_transferido_kg)
+        
+        if peso_transferido > peso_alocado:
+            raise HTTPException(status_code=400, detail="O peso transferido não pode ser maior que o peso alocado originalmente!")
+            
+        consumo_real_origem = peso_alocado - peso_transferido
+
+        # 1. Encerra a OP de Origem debitando apenas o consumido real
+        cursor.execute("""
+            UPDATE consumo_op_lote 
+            SET peso_devolvido = %s, consumo_real = %s, status = 'transferido', 
+                op_destino_transferencia = %s, data_fim = CURRENT_TIMESTAMP
+            WHERE id = %s;
+        """, (peso_transferido, consumo_real_origem, obj.nova_ordem_destino.strip(), obj.consumo_id))
+
+        # 2. Cria automaticamente o apontamento de entrada na Nova OP
+        cursor.execute("""
+            INSERT INTO consumo_op_lote (ordem_producao, maquina_numero, codigo_barras_lote, peso_alocado, operador)
+            VALUES (%s, %s, %s, %s, %s);
+        """, (obj.nova_ordem_destino.strip(), consumo_origem['maquina_numero'], consumo_origem['codigo_barras_lote'], peso_transferido, obj.operador))
+
+        cursor.execute("UPDATE lotes_estoque SET peso_atual = %s, status = 'em_linha' WHERE codigo_barras_lote = %s;", 
+                       (peso_transferido, consumo_origem['codigo_barras_lote']))
+
+        conn.commit()
+        cursor.close()
+        return {
+            "status": "sucesso",
+            "consumo_debitado_op_anterior": consumo_real_origem,
+            "peso_carregado_nova_op": peso_transferido
         }
     except HTTPException as h:
         if conn: conn.rollback()
