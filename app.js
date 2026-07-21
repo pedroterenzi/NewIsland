@@ -2,6 +2,7 @@ const API_URL = "https://newisland-zzhk.onrender.com";
 
 let usuarioLogado = null;
 let MESTRE_MATERIAIS = [], MESTRE_MAQUINAS = [];
+let loteConsultadoTemp = null;
 
 async function executarLogin() {
     const login = document.getElementById('login-usuario').value.trim();
@@ -93,8 +94,6 @@ function navegarPara(idAba) {
     if (tela) tela.classList.remove('escondido');
     if (nav) nav.classList.add('ativo');
 
-    if (idAba === 'abastecer') carregarLotesEmUsoNaLinha();
-    if (idAba === 'devolver') carregarListaParaDevolucao();
     if (idAba === 'visao') carregarVisaoOP();
     if (idAba === 'admin') renderizarGestao();
 }
@@ -109,137 +108,188 @@ function fecharModal(id) {
     if (modal) modal.classList.add('escondido'); 
 }
 
-// --- LÓGICA DE ABASTECIMENTO (BIPAR) ---
+// --- FLUXO 1: ABASTECER (CONSULTAR -> CONFIRMAR) ---
 
-async function processarBipagem() {
-    const op = document.getElementById('abs-op').value.trim();
-    const maquina = document.getElementById('abs-maquina').value;
+async function buscarDetalhesEtiqueta() {
     const barcode = document.getElementById('abs-barcode').value.trim();
-
-    if (!op || !barcode) {
-        alert("Digite a OP e bipa o código da bobina/lote!");
-        return;
-    }
+    if (!barcode) return;
 
     try {
-        const url = `${API_URL}/consumo/abastecer?ordem_producao=${encodeURIComponent(op)}&maquina_numero=${maquina}&codigo_barras_lote=${encodeURIComponent(barcode)}&operador=${encodeURIComponent(usuarioLogado.nome)}`;
-        const res = await fetch(url, { method: 'POST' });
-        const data = await res.json();
-
-        const boxFeedback = document.getElementById('feedback-bipagem');
-        boxFeedback.classList.remove('escondido');
-
+        const res = await fetch(`${API_URL}/lotes/consultar/${encodeURIComponent(barcode)}`);
         if (res.ok) {
-            boxFeedback.style.borderColor = "var(--success-color)";
-            boxFeedback.innerHTML = `<strong style="color:var(--success-color);">✔ Sucesso:</strong> ${data.mensagem}`;
-            document.getElementById('abs-barcode').value = '';
-            carregarLotesEmUsoNaLinha();
+            loteConsultadoTemp = await res.json();
+            
+            document.getElementById('prev-cod').innerText = loteConsultadoTemp.codigo_material;
+            document.getElementById('prev-desc').innerText = loteConsultadoTemp.descricao;
+            document.getElementById('prev-lote').innerText = loteConsultadoTemp.lote_fornecedor;
+            document.getElementById('prev-peso').innerText = `${loteConsultadoTemp.peso_atual} kg`;
+            
+            document.getElementById('preview-lote-box').classList.remove('escondido');
         } else {
-            boxFeedback.style.borderColor = "var(--danger-color)";
-            boxFeedback.innerHTML = `<strong style="color:var(--danger-color);">✖ Erro:</strong> ${data.detail}`;
+            const err = await res.json();
+            alert(`Erro: ${err.detail}`);
+            document.getElementById('preview-lote-box').classList.add('escondido');
+            document.getElementById('abs-barcode').value = '';
         }
     } catch (e) {
-        alert("Erro de conexão ao processar bipagem.");
+        alert("Erro ao buscar dados da etiqueta.");
     }
 }
 
-async function carregarLotesEmUsoNaLinha() {
+async function confirmarAbastecimentoLote() {
     const op = document.getElementById('abs-op').value.trim();
-    const maquina = document.getElementById('abs-maquina').value;
+    const maquina = parseInt(document.getElementById('abs-maquina').value);
 
-    let url = `${API_URL}/consumo/em-uso?`;
-    if (op) url += `ordem=${encodeURIComponent(op)}&`;
-    if (maquina) url += `maquina=${maquina}`;
-
-    try {
-        const res = await fetch(url);
-        if (res.ok) {
-            const lotes = await res.json();
-            const div = document.getElementById('lista-lotes-em-uso');
-            if (!div) return;
-
-            div.innerHTML = lotes.length === 0 ? "<p style='color:var(--text-muted); font-size:13px;'>Nenhum lote em uso informado para esta OP/Máquina.</p>" : lotes.map(l => `
-                <div class="item-list">
-                    <div>
-                        <strong style="color:var(--accent-orange);">${l.material_descricao}</strong><br>
-                        <span style="font-size:12px; color:var(--text-muted);">Lote: ${l.lote_fornecedor} | Peso Alocado: ${l.peso_alocado}kg</span>
-                    </div>
-                    <span class="badge-blue">Em Uso</span>
-                </div>
-            `).join('');
-        }
-    } catch (e) { console.error(e); }
-}
-
-// --- LÓGICA DE DEVOLUÇÃO DE SOBRAS ---
-
-async function carregarListaParaDevolucao() {
-    const op = document.getElementById('dev-filtro-op').value.trim();
-    let url = `${API_URL}/consumo/em-uso?`;
-    if (op) url += `ordem=${encodeURIComponent(op)}`;
-
-    try {
-        const res = await fetch(url);
-        if (res.ok) {
-            const lotes = await res.json();
-            const div = document.getElementById('lista-para-devolucao');
-            if (!div) return;
-
-            div.innerHTML = lotes.length === 0 ? "<p style='color:var(--text-muted); text-align:center;'>Nenhum lote pendente de devolução.</p>" : lotes.map(l => `
-                <div class="item-list">
-                    <div>
-                        <strong style="color:var(--accent-blue);">OP: ${l.ordem_producao} - Máq ${l.maquina_numero}</strong><br>
-                        <span style="font-size:13px;">${l.material_descricao} (Lote: ${l.lote_fornecedor})</span>
-                    </div>
-                    <button class="btn-small-edit" onclick="abrirDevolucaoModal(${l.id})">Devolver Sobra</button>
-                </div>
-            `).join('');
-        }
-    } catch (e) { console.error(e); }
-}
-
-function abrirDevolucaoModal(idConsumo) {
-    document.getElementById('form-dev-id').value = idConsumo;
-    document.getElementById('form-dev-peso').value = '';
-    abrirModal('modal-devolucao-item');
-}
-
-async function confirmarDevolucaoSobra() {
-    const idConsumo = parseInt(document.getElementById('form-dev-id').value);
-    const pesoBruto = parseFloat(document.getElementById('form-dev-peso').value);
-
-    if (isNaN(pesoBruto) || pesoBruto < 0) {
-        return alert("Digite o peso bruto válido medido na balança!");
+    if (!op) {
+        return alert("Digite a Ordem de Produção (OP) antes de confirmar!");
+    }
+    if (!loteConsultadoTemp) {
+        return alert("Bipa a etiqueta de matéria-prima primeiro!");
     }
 
-    const novoBarcodeSobra = "SOBRA-" + Math.floor(Math.random() * 899999 + 100000);
-
     try {
-        const res = await fetch(`${API_URL}/consumo/devolver`, {
+        const res = await fetch(`${API_URL}/consumo/abastecer`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
-                consumo_id: idConsumo,
-                peso_balanca_bruto: pesoBruto,
-                novo_codigo_barras_sobra: novoBarcodeSobra
+                ordem_producao: op,
+                maquina_numero: maquina,
+                codigo_barras_lote: loteConsultadoTemp.codigo_barras_lote,
+                operador: usuarioLogado.nome
             })
         });
 
         if (res.ok) {
-            const data = await res.json();
-            alert(`Sobras devolvidas!\nConsumo Real Registrado na OP: ${data.consumo_real_kg}kg\nSobra Gerada no Estoque: ${data.sobra_liquida_kg}kg\nEtiqueta da Sobra: ${data.nova_etiqueta}`);
-            fecharModal('modal-devolucao-item');
-            carregarListaParaDevolucao();
+            alert(`Sucesso! Lote ${loteConsultadoTemp.lote_fornecedor} alocado na OP ${op}.`);
+            document.getElementById('abs-barcode').value = '';
+            document.getElementById('preview-lote-box').classList.add('escondido');
+            loteConsultadoTemp = null;
         } else {
             const err = await res.json();
             alert(`Erro: ${err.detail}`);
         }
     } catch (e) {
-        alert("Erro ao registrar devolução.");
+        alert("Erro de conexão ao salvar apontamento.");
     }
 }
 
-// --- LÓGICA DE REFUGO (SCRAP) ---
+// --- FLUXO 2: DEVOLUÇÃO / TRANSFERÊNCIA ---
+
+async function buscarLoteAtivoDevolucao() {
+    const barcode = document.getElementById('dev-barcode').value.trim();
+    if (!barcode) return;
+
+    try {
+        const res = await fetch(`${API_URL}/consumo/buscar-ativo/${encodeURIComponent(barcode)}`);
+        if (res.ok) {
+            const consumo = await res.json();
+            
+            document.getElementById('dev-consumo-id').value = consumo.consumo_id;
+            document.getElementById('dev-info-op').innerText = consumo.ordem_producao;
+            document.getElementById('dev-info-cod').innerText = consumo.codigo_material;
+            document.getElementById('dev-info-desc').innerText = consumo.descricao;
+            document.getElementById('dev-info-peso').innerText = `${consumo.peso_alocado} kg`;
+            
+            document.getElementById('painel-devolucao').classList.remove('escondido');
+            alternarCamposDevolucao();
+        } else {
+            const err = await res.json();
+            alert(`Atenção: ${err.detail}`);
+            document.getElementById('painel-devolucao').classList.add('escondido');
+            document.getElementById('dev-barcode').value = '';
+        }
+    } catch (e) {
+        alert("Erro ao buscar apontamento ativo para devolução.");
+    }
+}
+
+function alternarCamposDevolucao() {
+    const tipo = document.getElementById('dev-tipo-operacao').value;
+    const boxFisica = document.getElementById('box-dev-fisica');
+    const boxSistemica = document.getElementById('box-dev-sistemica');
+
+    if (tipo === 'fisica') {
+        boxFisica.classList.remove('escondido');
+        boxSistemica.classList.add('escondido');
+    } else {
+        boxFisica.classList.add('escondido');
+        boxSistemica.classList.remove('escondido');
+    }
+}
+
+async function executarDevolucao() {
+    const consumoId = parseInt(document.getElementById('dev-consumo-id').value);
+    const tipo = document.getElementById('dev-tipo-operacao').value;
+
+    if (tipo === 'fisica') {
+        const pesoManual = parseFloat(document.getElementById('dev-peso-manual').value);
+        if (isNaN(pesoManual) || pesoManual < 0) {
+            return alert("Informe o peso medido na balança!");
+        }
+
+        try {
+            const res = await fetch(`${API_URL}/consumo/devolver-fisico`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    consumo_id: consumoId,
+                    peso_manual_kg: pesoManual,
+                    operador: usuarioLogado.nome
+                })
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                alert(`Devolução física concluída!\nConsumo cobrado da OP: ${data.consumo_real_op} kg\nSaldo retornado ao estoque: ${data.sobra_liquida_estoque} kg`);
+                resetarTelaDevolucao();
+            } else {
+                const err = await res.json();
+                alert(`Erro: ${err.detail}`);
+            }
+        } catch (e) { alert("Erro ao executar devolução física."); }
+
+    } else {
+        // SISTÊMICA (TRANSFERÊNCIA)
+        const novaOP = document.getElementById('dev-nova-op').value.trim();
+        const pesoTransferido = parseFloat(document.getElementById('dev-peso-transferido').value);
+
+        if (!novaOP || isNaN(pesoTransferido) || pesoTransferido <= 0) {
+            return alert("Informe a nova OP destino e a quantidade mantida na máquina!");
+        }
+
+        try {
+            const res = await fetch(`${API_URL}/consumo/transferir-op`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    consumo_id: consumoId,
+                    nova_ordem_destino: novaOP,
+                    peso_transferido_kg: pesoTransferido,
+                    operador: usuarioLogado.nome
+                })
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                alert(`Transferência Sistêmica Concluída!\nOP Anterior debitada em: ${data.consumo_debitado_op_anterior} kg\nNova OP (${novaOP}) carregada com: ${data.peso_carregado_nova_op} kg`);
+                resetarTelaDevolucao();
+            } else {
+                const err = await res.json();
+                alert(`Erro: ${err.detail}`);
+            }
+        } catch (e) { alert("Erro ao executar transferência sistêmica."); }
+    }
+}
+
+function resetarTelaDevolucao() {
+    document.getElementById('dev-barcode').value = '';
+    document.getElementById('dev-peso-manual').value = '';
+    document.getElementById('dev-nova-op').value = '';
+    document.getElementById('dev-peso-transferido').value = '';
+    document.getElementById('painel-devolucao').classList.add('escondido');
+}
+
+// --- FLUXO 3: REFUGO ---
 
 async function salvarRefugo() {
     const op = document.getElementById('ref-op').value.trim();
@@ -273,7 +323,7 @@ async function salvarRefugo() {
     }
 }
 
-// --- VISÃO CONSOLIDADA DA OP ---
+// --- VISÃO CONSOLIDADA ---
 
 async function carregarVisaoOP() {
     try {
@@ -296,7 +346,7 @@ async function carregarVisaoOP() {
     } catch (e) { console.error(e); }
 }
 
-// --- GESTÃO / ADMIN ---
+// --- ADMIN / CADASTROS ---
 
 function renderizarGestao() {
     const boxMat = document.getElementById('lista-admin-materiais');
