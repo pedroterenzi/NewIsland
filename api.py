@@ -5,7 +5,7 @@ from typing import List, Optional
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
-app = FastAPI()
+app = FastAPI(title="API Controle de Materiais e Rastreabilidade")
 
 app.add_middleware(
     CORSMiddleware,
@@ -26,85 +26,143 @@ def inicializar_banco():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Criação base (Segura)
-        cursor.execute("CREATE TABLE IF NOT EXISTS usuarios (id SERIAL PRIMARY KEY, login VARCHAR(100) UNIQUE NOT NULL, senha VARCHAR(100) NOT NULL, nome VARCHAR(255) NOT NULL, nivel INT DEFAULT 1);")
-        cursor.execute("CREATE TABLE IF NOT EXISTS maquinas (id SERIAL PRIMARY KEY, numero_maquina INT UNIQUE NOT NULL, tipo VARCHAR(50) NOT NULL, ativo BOOLEAN DEFAULT TRUE);")
-        cursor.execute("CREATE TABLE IF NOT EXISTS tipos_tno (id SERIAL PRIMARY KEY, nome VARCHAR(100) UNIQUE NOT NULL);")
-        cursor.execute("CREATE TABLE IF NOT EXISTS master_sku (id SERIAL PRIMARY KEY, codigo_sku VARCHAR(100) UNIQUE NOT NULL, descricao VARCHAR(255), fraldas_por_pacote INT NOT NULL, pacotes_por_fardo INT NOT NULL, fardos_por_pallet INT NOT NULL);")
-        cursor.execute("CREATE TABLE IF NOT EXISTS codigos_parada (id SERIAL PRIMARY KEY, tipo_maquina VARCHAR(50) NOT NULL, numero VARCHAR(50) NOT NULL, problema VARCHAR(255) NOT NULL, UNIQUE(tipo_maquina, numero));")
-        cursor.execute("CREATE TABLE IF NOT EXISTS registro_turnos (id SERIAL PRIMARY KEY, data_registro DATE NOT NULL, turno INT NOT NULL, operador VARCHAR(255) NOT NULL, maquina_numero INT NOT NULL);")
-        
-        # CRIAÇÃO COM A NOVA COLUNA DE FARDOS
+        # 1. Usuários
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS result_by_order (
+            CREATE TABLE IF NOT EXISTS usuarios (
                 id SERIAL PRIMARY KEY, 
-                turno_id INT REFERENCES registro_turnos(id) ON DELETE CASCADE, 
-                ordem VARCHAR(100) NOT NULL, 
-                codigo_sku VARCHAR(100) NOT NULL, 
-                horario_padrao INT NOT NULL, 
-                run_time INT NOT NULL, 
-                machine_counter INT NOT NULL, 
-                pallets INT NOT NULL, 
-                fardos_avulsos INT NOT NULL, 
-                total_fardos INT DEFAULT 0, 
-                total_pecas_estoque INT NOT NULL, 
-                taxa_movimentacao NUMERIC(5,2), 
-                taxa_loss NUMERIC(5,2)
+                login VARCHAR(100) UNIQUE NOT NULL, 
+                senha VARCHAR(100) NOT NULL, 
+                nome VARCHAR(255) NOT NULL, 
+                nivel INT DEFAULT 1
             );
         """)
-        cursor.execute("CREATE TABLE IF NOT EXISTS ordem_tno (id SERIAL PRIMARY KEY, ordem_id INT REFERENCES result_by_order(id) ON DELETE CASCADE, tipo_tno VARCHAR(100) NOT NULL, tempo_tno INT NOT NULL);")
-        cursor.execute("CREATE TABLE IF NOT EXISTS stop_machine_item (id SERIAL PRIMARY KEY, turno_id INT REFERENCES registro_turnos(id) ON DELETE CASCADE, numero_parada VARCHAR(50) NOT NULL, minutos_parados INT NOT NULL);")
         
-        # Garante o admin
+        # 2. Máquinas
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS maquinas (
+                id SERIAL PRIMARY KEY, 
+                numero_maquina INT UNIQUE NOT NULL, 
+                tipo VARCHAR(50) NOT NULL, 
+                ativo BOOLEAN DEFAULT TRUE
+            );
+        """)
+        
+        # 3. Cadastro Mestre de Materiais (TNT, SAP, Cola, Lycra)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS master_materiais (
+                id SERIAL PRIMARY KEY,
+                codigo_material VARCHAR(100) UNIQUE NOT NULL,
+                descricao VARCHAR(255) NOT NULL,
+                tipo_material VARCHAR(50) NOT NULL,
+                peso_tubete_padrao NUMERIC(6,2) DEFAULT 0.00
+            );
+        """)
+
+        # 4. Lotes e Bobinas em Estoque / WIP
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS lotes_estoque (
+                id SERIAL PRIMARY KEY,
+                codigo_barras_lote VARCHAR(100) UNIQUE NOT NULL,
+                codigo_material VARCHAR(100) REFERENCES master_materiais(codigo_material) ON DELETE CASCADE,
+                lote_fornecedor VARCHAR(100) NOT NULL,
+                peso_inicial NUMERIC(8,2) NOT NULL,
+                peso_atual NUMERIC(8,2) NOT NULL,
+                status VARCHAR(50) DEFAULT 'em_estoque',
+                data_entrada TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+
+        # 5. Consumo Real por Ordem de Produção (Scan & Play)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS consumo_op_lote (
+                id SERIAL PRIMARY KEY,
+                ordem_producao VARCHAR(100) NOT NULL,
+                maquina_numero INT NOT NULL,
+                codigo_barras_lote VARCHAR(100) REFERENCES lotes_estoque(codigo_barras_lote) ON DELETE CASCADE,
+                peso_alocado NUMERIC(8,2) NOT NULL,
+                peso_devolvido NUMERIC(8,2) DEFAULT 0,
+                consumo_real NUMERIC(8,2) DEFAULT 0,
+                operador VARCHAR(255) NOT NULL,
+                data_inicio TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                data_fim TIMESTAMP,
+                status VARCHAR(50) DEFAULT 'em_uso'
+            );
+        """)
+
+        # 6. Apontamento de Refugo (Scrap) de Fraldas
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS apontamento_refugo (
+                id SERIAL PRIMARY KEY,
+                ordem_producao VARCHAR(100) NOT NULL,
+                maquina_numero INT NOT NULL,
+                peso_refugo_kg NUMERIC(8,2) NOT NULL,
+                tipo_refugo VARCHAR(100) NOT NULL,
+                operador VARCHAR(255) NOT NULL,
+                data_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        
+        # Garante o admin padrão
         cursor.execute("SELECT id FROM usuarios WHERE login = 'admin';")
         if not cursor.fetchone():
             cursor.execute("INSERT INTO usuarios (login, senha, nome, nivel) VALUES ('admin', 'admin', 'Administrador Global', 3);")
-        conn.commit()
-
-        # SUPER ATUALIZAÇÃO MESTRA:
-        # Se a tabela já existia sem a coluna total_fardos, ele adiciona e recalcula retroativamente!
-        try:
-            cursor.execute("ALTER TABLE result_by_order ADD COLUMN total_fardos INT DEFAULT 0;")
-            conn.commit()
             
-            # Recalcula OPs antigas para consertar seu histórico
-            cursor.execute("""
-                UPDATE result_by_order ro
-                SET total_fardos = (ro.pallets * COALESCE(s.fardos_por_pallet, 0)) + ro.fardos_avulsos
-                FROM master_sku s
-                WHERE ro.codigo_sku = s.codigo_sku AND ro.total_fardos = 0;
-            """)
-            conn.commit()
-        except Exception:
-            conn.rollback() # A coluna já existe, segue o jogo.
-
+        conn.commit()
         cursor.close()
     except Exception as e:
-        print(f"Erro Inicializacao: {e}")
+        print(f"Erro na inicializacao do banco: {e}")
     finally:
         if conn:
             conn.close()
 
 inicializar_banco()
 
-class ModelAuth(BaseModel): login: str; senha: str
-class ModelUsuario(BaseModel): login: str; senha: str; nome: str; nivel: int
-class ModelSKU(BaseModel): codigo_sku: str; descricao: str; fraldas_por_pacote: int; pacotes_por_fardo: int; fardos_por_pallet: int
-class ModelMaquina(BaseModel): numero_maquina: int; tipo: str; ativo: bool
-class ModelParadaMestre(BaseModel): tipo_maquina: str; numero: str; problema: str
-class ModelTNOMestre(BaseModel): nome: str
+# --- MODELOS PYDANTIC ---
+class ModelAuth(BaseModel):
+    login: str
+    senha: str
 
-class TNOOrdem(BaseModel): tipo_tno: str; tempo_tno: int
-class OrdemProducao(BaseModel): 
-    ordem: str; codigo_sku: str; horario_padrao: int; run_time: int; machine_counter: int
-    pallets: int; fardos_avulsos: int; tnos: List[TNOOrdem]
-class ParadaTurno(BaseModel): numero_parada: str; minutos_parados: int
-class PayloadApontamento(BaseModel): data_registro: str; turno: int; operador: str; maquina: int; ordens: List[OrdemProducao]; paradas: List[ParadaTurno]
+class ModelUsuario(BaseModel):
+    login: str
+    senha: str
+    nome: str
+    nivel: int
 
+class ModelMaquina(BaseModel):
+    numero_maquina: int
+    tipo: str
+    ativo: bool
+
+class ModelMaterial(BaseModel):
+    codigo_material: str
+    descricao: str
+    tipo_material: str
+    peso_tubete_padrao: float
+
+class ModelLoteEstoque(BaseModel):
+    codigo_barras_lote: str
+    codigo_material: str
+    lote_fornecedor: str
+    peso_inicial: float
+
+class ModelDevolucao(BaseModel):
+    consumo_id: int
+    peso_balanca_bruto: float
+    novo_codigo_barras_sobra: str
+
+class ModelRefugo(BaseModel):
+    ordem_producao: str
+    maquina_numero: int
+    peso_refugo_kg: float
+    tipo_refugo: str
+    operador: str
+
+# --- ROTAS DE AUTENTICAÇÃO E MESTRES ---
 @app.post("/usuarios/auth")
 def autenticar(obj: ModelAuth):
     login = obj.login.strip().lower()
-    if login == "admin" and obj.senha == "admin": return {"login": "admin", "nome": "Administrador Global", "nivel": 3}
+    if login == "admin" and obj.senha == "admin":
+        return {"login": "admin", "nome": "Administrador Global", "nivel": 3}
     
     conn = None
     try:
@@ -113,12 +171,16 @@ def autenticar(obj: ModelAuth):
         cursor.execute("SELECT login, nome, nivel FROM usuarios WHERE login = %s AND senha = %s;", (login, obj.senha))
         user = cursor.fetchone()
         cursor.close()
-        if user: return user
+        if user:
+            return user
         raise HTTPException(status_code=401, detail="Usuário ou senha inválidos")
-    except HTTPException as h: raise h
-    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException as h:
+        raise h
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
-        if conn: conn.close()
+        if conn:
+            conn.close()
 
 @app.get("/dados-mestres")
 def obter_dados_mestres():
@@ -127,161 +189,164 @@ def obter_dados_mestres():
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         dados = {}
-        cursor.execute("SELECT * FROM master_sku ORDER BY codigo_sku ASC;"); dados["skus"] = cursor.fetchall()
-        cursor.execute("SELECT * FROM codigos_parada ORDER BY tipo_maquina, numero ASC;"); dados["paradas"] = cursor.fetchall()
-        cursor.execute("SELECT * FROM tipos_tno ORDER BY nome ASC;"); dados["tnos"] = cursor.fetchall()
-        cursor.execute("SELECT * FROM maquinas ORDER BY numero_maquina ASC;"); dados["maquinas"] = cursor.fetchall()
-        cursor.execute("SELECT id, login, nome, nivel FROM usuarios WHERE login != 'admin' ORDER BY nome ASC;"); dados["usuarios"] = cursor.fetchall()
+        cursor.execute("SELECT * FROM master_materiais ORDER BY codigo_material ASC;")
+        dados["materiais"] = cursor.fetchall()
+        cursor.execute("SELECT * FROM maquinas ORDER BY numero_maquina ASC;")
+        dados["maquinas"] = cursor.fetchall()
+        cursor.execute("SELECT id, login, nome, nivel FROM usuarios WHERE login != 'admin' ORDER BY nome ASC;")
+        dados["usuarios"] = cursor.fetchall()
         cursor.close()
         return dados
-    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if conn: conn.close()
-
-def processar_apontamento(dados: PayloadApontamento, cursor, turno_id=None):
-    cargas = {1: 455, 2: 440, 3: 415}
-    tempo_turno = cargas.get(dados.turno, 440)
-    soma_hp = sum(o.horario_padrao for o in dados.ordens)
-    soma_rt = sum(o.run_time for o in dados.ordens)
-    soma_tno = sum(t.tempo_tno for o in dados.ordens for t in o.tnos)
-    soma_paradas = sum(p.minutos_parados for p in dados.paradas)
-
-    if (soma_hp + soma_tno) != tempo_turno: raise HTTPException(status_code=400, detail=f"Soma HP ({soma_hp}m) + TNO ({soma_tno}m) não fechou {tempo_turno}m.")
-    if (soma_hp - soma_rt) != soma_paradas: raise HTTPException(status_code=400, detail="Inconsistência nas paradas.")
-
-    if turno_id:
-        cursor.execute("UPDATE registro_turnos SET data_registro=%s, turno=%s, operador=%s, maquina_numero=%s WHERE id=%s;", (dados.data_registro, dados.turno, dados.operador, dados.maquina, turno_id))
-        cursor.execute("DELETE FROM result_by_order WHERE turno_id = %s;", (turno_id,))
-        cursor.execute("DELETE FROM stop_machine_item WHERE turno_id = %s;", (turno_id,))
-    else:
-        cursor.execute("INSERT INTO registro_turnos (data_registro, turno, operador, maquina_numero) VALUES (%s, %s, %s, %s) RETURNING id;", (dados.data_registro, dados.turno, dados.operador, dados.maquina))
-        turno_id = cursor.fetchone()[0]
-
-    for o in dados.ordens:
-        cursor.execute("SELECT fraldas_por_pacote, pacotes_por_fardo, fardos_por_pallet FROM master_sku WHERE codigo_sku = %s;", (o.codigo_sku,))
-        sku = cursor.fetchone()
-        fraldas, pacotes, fardos_pallet = sku if sku else (0, 0, 0)
-        
-        # AGORA CALCULA E GUARDA O Fardo DE FORMA DEFINITIVA
-        total_fardos = (o.pallets * fardos_pallet) + o.fardos_avulsos
-        total_pecas = total_fardos * pacotes * fraldas
-        taxa_mov = (o.run_time / o.horario_padrao * 100) if o.horario_padrao > 0 else 0
-        taxa_loss = ((o.machine_counter - total_pecas) / o.machine_counter * 100) if o.machine_counter > 0 else 0
-        
-        cursor.execute("""
-            INSERT INTO result_by_order 
-            (turno_id, ordem, codigo_sku, horario_padrao, run_time, machine_counter, pallets, fardos_avulsos, total_fardos, total_pecas_estoque, taxa_movimentacao, taxa_loss) 
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id;
-        """, (turno_id, o.ordem, o.codigo_sku, o.horario_padrao, o.run_time, o.machine_counter, o.pallets, o.fardos_avulsos, total_fardos, total_pecas, taxa_mov, taxa_loss))
-        ordem_id = cursor.fetchone()[0]
-        
-        for t in o.tnos:
-            if t.tipo_tno: cursor.execute("INSERT INTO ordem_tno (ordem_id, tipo_tno, tempo_tno) VALUES (%s, %s, %s);", (ordem_id, t.tipo_tno, t.tempo_tno))
-    
-    for p in dados.paradas:
-        cursor.execute("INSERT INTO stop_machine_item (turno_id, numero_parada, minutos_parados) VALUES (%s, %s, %s);", (turno_id, p.numero_parada, p.minutos_parados))
-
-@app.post("/apontamentos")
-def criar_apontamento(dados: PayloadApontamento):
-    conn = None
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        processar_apontamento(dados, cursor)
-        conn.commit()
-        cursor.close()
-        return {"status": "sucesso"}
-    except HTTPException as h:
-        if conn: conn.rollback()
-        raise h
     except Exception as e:
-        if conn: conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        if conn: conn.close()
+        if conn:
+            conn.close()
 
-@app.put("/apontamentos/{id}")
-def atualizar_apontamento(id: int, dados: PayloadApontamento):
-    conn = None
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        processar_apontamento(dados, cursor, turno_id=id)
-        conn.commit()
-        cursor.close()
-        return {"status": "sucesso"}
-    except HTTPException as h:
-        if conn: conn.rollback()
-        raise h
-    except Exception as e:
-        if conn: conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if conn: conn.close()
+# --- ROTAS OPERACIONAIS (ABASTECER, DEVOLVER, REFUGO) ---
 
-@app.get("/apontamentos")
-def listar_lancamentos(data: str = None, turno: str = None, maquina: str = None, ordem: str = None):
+@app.post("/consumo/abastecer")
+def abastecer_linha(ordem_producao: str, maquina_numero: int, codigo_barras_lote: str, operador: str):
     conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
-        query = "SELECT r.id, r.data_registro::text, r.turno, r.operador, r.maquina_numero, (SELECT COALESCE(SUM(machine_counter),0) FROM result_by_order WHERE turno_id = r.id) as total_mc FROM registro_turnos r WHERE 1=1 "
+        
+        # 1. Verifica se o lote existe e se está disponível
+        cursor.execute("SELECT * FROM lotes_estoque WHERE codigo_barras_lote = %s AND status != 'consumido';", (codigo_barras_lote,))
+        lote = cursor.fetchone()
+        if not lote:
+            raise HTTPException(status_code=404, detail="Lote/Bobina não encontrado no estoque ou já consumido!")
+
+        # 2. Insere a alocação na OP
+        cursor.execute("""
+            INSERT INTO consumo_op_lote (ordem_producao, maquina_numero, codigo_barras_lote, peso_alocado, operador)
+            VALUES (%s, %s, %s, %s, %s) RETURNING id;
+        """, (ordem_producao, maquina_numero, codigo_barras_lote, lote['peso_atual'], operador))
+        
+        # 3. Atualiza o status do lote no estoque
+        cursor.execute("UPDATE lotes_estoque SET status = 'em_linha' WHERE codigo_barras_lote = %s;", (codigo_barras_lote,))
+        
+        conn.commit()
+        cursor.close()
+        return {"status": "sucesso", "mensagem": f"Lote {lote['lote_fornecedor']} ({lote['peso_atual']}kg) carregado na OP {ordem_producao}!"}
+    except HTTPException as h:
+        if conn: conn.rollback()
+        raise h
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: conn.close()
+
+@app.get("/consumo/em-uso")
+def listar_lotes_em_uso(ordem: str = None, maquina: int = None):
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        query = """
+            SELECT c.id, c.ordem_producao, c.maquina_numero, c.codigo_barras_lote, c.peso_alocado, 
+                   c.operador, c.data_inicio::text, l.codigo_material, m.descricao as material_descricao, l.lote_fornecedor
+            FROM consumo_op_lote c
+            JOIN lotes_estoque l ON c.codigo_barras_lote = l.codigo_barras_lote
+            JOIN master_materiais m ON l.codigo_material = m.codigo_material
+            WHERE c.status = 'em_uso'
+        """
         params = []
-        if data: query += "AND r.data_registro = %s "; params.append(data)
-        if turno: query += "AND r.turno = %s "; params.append(turno)
-        if maquina: query += "AND r.maquina_numero = %s "; params.append(maquina)
-        if ordem: query += "AND EXISTS (SELECT 1 FROM result_by_order WHERE turno_id = r.id AND ordem ILIKE %s) "; params.append(f"%{ordem}%")
-        query += "ORDER BY r.data_registro DESC, r.turno ASC LIMIT 100;"
+        if ordem:
+            query += " AND c.ordem_producao ILIKE %s"
+            params.append(f"%{ordem}%")
+        if maquina:
+            query += " AND c.maquina_numero = %s"
+            params.append(maquina)
+            
+        query += " ORDER BY c.id DESC;"
         cursor.execute(query, tuple(params))
         res = cursor.fetchall()
         cursor.close()
         return res
-    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         if conn: conn.close()
 
-@app.get("/apontamentos/{id}")
-def obter_lancamento_completo(id: int):
+@app.post("/consumo/devolver")
+def devolver_sobra(obj: ModelDevolucao):
     conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
-        cursor.execute("SELECT id, data_registro::text, turno, operador, maquina_numero as maquina FROM registro_turnos WHERE id = %s;", (id,))
-        turno = cursor.fetchone()
-        if not turno: raise HTTPException(status_code=404, detail="Turno não encontrado")
         
-        cursor.execute("SELECT id, ordem, codigo_sku, horario_padrao, run_time, machine_counter, pallets, fardos_avulsos, total_fardos FROM result_by_order WHERE turno_id = %s;", (id,))
-        ordens = cursor.fetchall()
+        cursor.execute("""
+            SELECT c.*, m.peso_tubete_padrao, l.codigo_material, l.lote_fornecedor
+            FROM consumo_op_lote c
+            JOIN lotes_estoque l ON c.codigo_barras_lote = l.codigo_barras_lote
+            JOIN master_materiais m ON l.codigo_material = m.codigo_material
+            WHERE c.id = %s AND c.status = 'em_uso';
+        """, (obj.consumo_id,))
+        consumo = cursor.fetchone()
         
-        lista_ordens = []
-        for o in ordens:
-            od = dict(o)
-            cursor.execute("SELECT tipo_tno, tempo_tno FROM ordem_tno WHERE ordem_id = %s;", (od['id'],))
-            od['tnos'] = cursor.fetchall()
-            lista_ordens.append(od)
+        if not consumo:
+            raise HTTPException(status_code=404, detail="Apontamento de uso não encontrado ou já finalizado.")
             
-        cursor.execute("SELECT numero_parada, minutos_parados FROM stop_machine_item WHERE turno_id = %s;", (id,))
-        paradas = cursor.fetchall()
-        
-        turno['ordens'] = lista_ordens
-        turno['paradas'] = paradas
+        peso_tubete = float(consumo['peso_tubete_padrao'])
+        sobra_liquida = float(obj.peso_balanca_bruto) - peso_tubete
+        if sobra_liquida < 0:
+            sobra_liquida = 0.0
+            
+        peso_alocado = float(consumo['peso_alocado'])
+        consumo_real = peso_alocado - sobra_liquida
+        if consumo_real < 0:
+            consumo_real = 0.0
+
+        cursor.execute("""
+            UPDATE consumo_op_lote 
+            SET peso_devolvido = %s, consumo_real = %s, status = 'finalizado', data_fim = CURRENT_TIMESTAMP
+            WHERE id = %s;
+        """, (sobra_liquida, consumo_real, obj.consumo_id))
+
+        cursor.execute("UPDATE lotes_estoque SET status = 'consumido' WHERE codigo_barras_lote = %s;", (consumo['codigo_barras_lote'],))
+
+        if sobra_liquida > 0:
+            cursor.execute("""
+                INSERT INTO lotes_estoque (codigo_barras_lote, codigo_material, lote_fornecedor, peso_inicial, peso_atual, status)
+                VALUES (%s, %s, %s, %s, %s, 'em_estoque');
+            """, (obj.novo_codigo_barras_sobra, consumo['codigo_material'], consumo['lote_fornecedor'] + "-SOBRA", sobra_liquida, sobra_liquida))
+
+        conn.commit()
         cursor.close()
-        return turno
-    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+        return {
+            "status": "sucesso", 
+            "consumo_real_kg": consumo_real, 
+            "sobra_liquida_kg": sobra_liquida,
+            "nova_etiqueta": obj.novo_codigo_barras_sobra
+        }
+    except HTTPException as h:
+        if conn: conn.rollback()
+        raise h
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         if conn: conn.close()
 
-@app.delete("/apontamentos/{id}")
-def deletar_lancamento(id: int):
+@app.post("/refugo/apontar")
+def apontar_refugo(obj: ModelRefugo):
     conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM registro_turnos WHERE id = %s;", (id,))
+        cursor.execute("""
+            INSERT INTO apontamento_refugo (ordem_producao, maquina_numero, peso_refugo_kg, tipo_refugo, operador)
+            VALUES (%s, %s, %s, %s, %s);
+        """, (obj.ordem_producao, obj.maquina_numero, obj.peso_refugo_kg, obj.tipo_refugo, obj.operador))
         conn.commit()
         cursor.close()
-        return {"status": "removido"}
-    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+        return {"status": "sucesso", "mensagem": "Refugo registrado com sucesso!"}
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         if conn: conn.close()
 
@@ -291,69 +356,109 @@ def visao_ordens():
     try:
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
-        # SOMA O TOTAL DE FARDOS QUE ESTÁ SALVO DIRETO NA OP!
         cursor.execute("""
-            SELECT ro.ordem, MAX(rt.maquina_numero) as maquina, ro.codigo_sku, 
-            SUM(ro.machine_counter) as total_mc, SUM(ro.total_pecas_estoque) as pecas_estoque, 
-            SUM(ro.horario_padrao) as hp_total, SUM(ro.run_time) as rt_total, 
-            SUM(ro.pallets) as pallets, SUM(ro.fardos_avulsos) as fardos_avulsos,
-            SUM(ro.total_fardos) as total_fardos_calculado
-            FROM result_by_order ro
-            JOIN registro_turnos rt ON ro.turno_id = rt.id
-            GROUP BY ro.ordem, ro.codigo_sku ORDER BY ro.ordem DESC LIMIT 150;
+            SELECT 
+                c.ordem_producao,
+                MAX(c.maquina_numero) as maquina,
+                COUNT(DISTINCT c.codigo_barras_lote) as total_lotes_bipados,
+                SUM(c.peso_alocado) as total_alocado_kg,
+                SUM(c.peso_devolvido) as total_devolvido_kg,
+                SUM(c.consumo_real) as consumo_real_total_kg,
+                COALESCE((SELECT SUM(r.peso_refugo_kg) FROM apontamento_refugo r WHERE r.ordem_producao = c.ordem_producao), 0) as total_refugo_kg
+            FROM consumo_op_lote c
+            GROUP BY c.ordem_producao
+            ORDER BY c.ordem_producao DESC LIMIT 100;
         """)
         linhas = cursor.fetchall()
         cursor.close()
         return linhas
-    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if conn: conn.close()
-
-def db_execute(query, params=None):
-    conn = None
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        if params: cursor.execute(query, params)
-        else: cursor.execute(query)
-        conn.commit()
-        cursor.close()
-        return {"status": "sucesso"}
     except Exception as e:
-        if conn: conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         if conn: conn.close()
 
+# --- ADMIN E CADASTROS ---
+
+@app.post("/admin/materiais")
+def criar_material(m: ModelMaterial):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            INSERT INTO master_materiais (codigo_material, descricao, tipo_material, peso_tubete_padrao)
+            VALUES (%s, %s, %s, %s);
+        """, (m.codigo_material, m.descricao, m.tipo_material, m.peso_tubete_padrao))
+        conn.commit()
+        cursor.close()
+        return {"status": "sucesso"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+@app.post("/admin/lotes")
+def cadastrar_lote(l: ModelLoteEstoque):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            INSERT INTO lotes_estoque (codigo_barras_lote, codigo_material, lote_fornecedor, peso_inicial, peso_atual)
+            VALUES (%s, %s, %s, %s, %s);
+        """, (l.codigo_barras_lote, l.codigo_material, l.lote_fornecedor, l.peso_inicial, l.peso_inicial))
+        conn.commit()
+        cursor.close()
+        return {"status": "sucesso"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
 @app.post("/admin/maquinas")
-def c_m(m: ModelMaquina): return db_execute("INSERT INTO maquinas (numero_maquina, tipo, ativo) VALUES (%s, %s, %s);", (m.numero_maquina, m.tipo, m.ativo))
-@app.put("/admin/maquinas/{id}")
-def u_m(id: int, m: ModelMaquina): return db_execute("UPDATE maquinas SET numero_maquina=%s, tipo=%s, ativo=%s WHERE id=%s;", (m.numero_maquina, m.tipo, m.ativo, id))
-
-@app.post("/admin/tnos")
-def c_t(t: ModelTNOMestre): return db_execute("INSERT INTO tipos_tno (nome) VALUES (%s);", (t.nome,))
-@app.put("/admin/tnos/{id}")
-def u_t(id: int, t: ModelTNOMestre): return db_execute("UPDATE tipos_tno SET nome=%s WHERE id=%s;", (t.nome, id))
-@app.delete("/admin/tnos/{id}")
-def d_t(id: int): return db_execute("DELETE FROM tipos_tno WHERE id=%s;", (id,))
-
-@app.post("/admin/paradas")
-def c_p(p: ModelParadaMestre): return db_execute("INSERT INTO codigos_parada (tipo_maquina, numero, problema) VALUES (%s, %s, %s);", (p.tipo_maquina, p.numero, p.problema))
-@app.put("/admin/paradas/{id}")
-def u_p(id: int, p: ModelParadaMestre): return db_execute("UPDATE codigos_parada SET tipo_maquina=%s, numero=%s, problema=%s WHERE id=%s;", (p.tipo_maquina, p.numero, p.problema, id))
-@app.delete("/admin/paradas/{id}")
-def d_p(id: int): return db_execute("DELETE FROM codigos_parada WHERE id=%s;", (id,))
+def criar_maquina(m: ModelMaquina):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("INSERT INTO maquinas (numero_maquina, tipo, ativo) VALUES (%s, %s, %s);", (m.numero_maquina, m.tipo, m.ativo))
+        conn.commit()
+        cursor.close()
+        return {"status": "sucesso"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
 
 @app.post("/admin/usuarios")
-def c_u(u: ModelUsuario): return db_execute("INSERT INTO usuarios (login, senha, nome, nivel) VALUES (%s, %s, %s, %s);", (u.login, u.senha, u.nome, u.nivel))
-@app.put("/admin/usuarios/{id}")
-def u_u(id: int, u: ModelUsuario): return db_execute("UPDATE usuarios SET login=%s, senha=%s, nome=%s, nivel=%s WHERE id=%s;", (u.login.lower(), u.senha, u.nome, u.nivel, id))
-@app.delete("/admin/usuarios/{id}")
-def d_u(id: int): return db_execute("DELETE FROM usuarios WHERE id=%s;", (id,))
+def criar_usuario(u: ModelUsuario):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("INSERT INTO usuarios (login, senha, nome, nivel) VALUES (%s, %s, %s, %s);", (u.login.lower(), u.senha, u.nome, u.nivel))
+        conn.commit()
+        cursor.close()
+        return {"status": "sucesso"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
 
-@app.post("/admin/skus")
-def c_s(s: ModelSKU): return db_execute("INSERT INTO master_sku (codigo_sku, descricao, fraldas_por_pacote, pacotes_por_fardo, fardos_por_pallet) VALUES (%s, %s, %s, %s, %s);", (s.codigo_sku, s.descricao, s.fraldas_por_pacote, s.pacotes_por_fardo, s.fardos_por_pallet))
-@app.put("/skus/{id}")
-def u_s(id: int, s: ModelSKU): return db_execute("UPDATE master_sku SET codigo_sku=%s, descricao=%s, fraldas_por_pacote=%s, pacotes_por_fardo=%s, fardos_por_pallet=%s WHERE id=%s;", (s.codigo_sku, s.descricao, s.fraldas_por_pacote, s.pacotes_por_fardo, s.fardos_por_pallet, id))
-@app.delete("/skus/{id}")
-def d_s(id: int): return db_execute("DELETE FROM master_sku WHERE id=%s;", (id,))
+@app.delete("/admin/{tabela}/{id_reg}")
+def deletar_registro(tabela: str, id_reg: int):
+    tabelas_validas = ["master_materiais", "lotes_estoque", "maquinas", "usuarios"]
+    if tabela not in tabelas_validas:
+        raise HTTPException(status_code=400, detail="Tabela inválida")
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(f"DELETE FROM {tabela} WHERE id = %s;", (id_reg,))
+        conn.commit()
+        cursor.close()
+        return {"status": "sucesso"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
