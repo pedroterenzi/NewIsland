@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Unicharm - Rastreabilidade de Materiais</title>
+    <title>Unicharm MP - Rastreabilidade</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -48,16 +48,13 @@
         .btn-dash:hover { background: rgba(59, 130, 246, 0.1); }
         
         .btn-small-delete { background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); padding: 10px 14px; border-radius: 10px; font-size: 12px; font-weight: 600; cursor: pointer; transition: 0.2s;}
-        .btn-small-delete:hover { background: #ef4444; color: #fff; }
-        
-        .btn-small-edit { background: rgba(59, 130, 246, 0.1); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.2); padding: 10px 14px; border-radius: 10px; font-size: 12px; font-weight: 600; cursor: pointer; transition: 0.2s;}
-        .btn-small-edit:hover { background: #3b82f6; color: #fff; }
         
         .item-list { background: #0f172a; border: 1px solid #1e293b; padding: 18px; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
         
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         
         .resumo-box { background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.2); padding: 18px; border-radius: 16px; margin-bottom: 20px; }
+        .resumo-item { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 8px; color: var(--text-muted);}
         
         .nav-inferior { 
             position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); 
@@ -107,95 +104,126 @@
     <!-- LOGIN -->
     <div id="tela-login" class="card" style="margin-top: 10vh;">
         <h2 style="color: var(--accent-blue);">Unicharm MP</h2>
-        <p style="text-align:center; color:var(--text-muted); font-size: 14px; margin-bottom: 30px;">Rastreabilidade & Consumo de Materiais</p>
+        <p style="text-align:center; color:var(--text-muted); font-size: 14px; margin-bottom: 30px;">Rastreabilidade Eletrônica de Matéria-Prima</p>
         <div class="form-group"><label>Usuário:</label><input type="text" id="login-usuario" placeholder="Digite seu login"></div>
         <div class="form-group"><label>Senha:</label><input type="password" id="login-senha" placeholder="Digite sua senha"></div>
         <button class="btn-blue" id="btn-entrar" onclick="executarLogin()" style="margin-top: 10px;">Acessar Sistema</button>
     </div>
 
-    <!-- ABA 1: ABASTECER MÁQUINA (BIPAR) -->
+    <!-- ABA 1: ABASTECER MÁQUINA (SETAR MP) -->
     <div id="tela-abastecer" class="escondido aba-conteudo">
         <div style="margin-bottom: 24px; text-align: center;">
-            <h2>Carregar Máquina</h2>
+            <h2>Apontar Consumo de MP</h2>
             <p id="txt-user" style="margin:0; color: var(--accent-orange); font-weight: bold; font-size: 14px;">Operador: ...</p>
         </div>
 
         <div class="card">
-            <h3>1. Identificação da Linha</h3>
+            <h3>1. Dados da Linha</h3>
             <div class="grid-2">
                 <div class="form-group">
                     <label>Ordem de Produção (OP):</label>
-                    <input type="text" id="abs-op" placeholder="Ex: OP-2026-001" oninput="carregarLotesEmUsoNaLinha()">
+                    <input type="text" id="abs-op" placeholder="Ex: OP-2026-001">
                 </div>
                 <div class="form-group">
                     <label>Máquina:</label>
-                    <select id="abs-maquina" onchange="carregarLotesEmUsoNaLinha()"></select>
+                    <select id="abs-maquina"></select>
                 </div>
             </div>
         </div>
 
         <div class="card">
-            <h3>2. Bipar Código da Bobina / Lote</h3>
+            <h3>2. Bipar Etiqueta da MP</h3>
             <div class="form-group">
                 <label style="color: var(--accent-orange);">Leitura do Código de Barras:</label>
-                <input type="text" id="abs-barcode" placeholder="Clique aqui e bipa com o leitor..." onchange="processarBipagem()">
+                <input type="text" id="abs-barcode" placeholder="Bipa o código aqui..." onchange="buscarDetalhesEtiqueta()">
             </div>
-            <div id="feedback-bipagem" class="resumo-box escondido"></div>
-        </div>
 
-        <div class="card">
-            <h3>Materiais Atualmente na Máquina</h3>
-            <div id="lista-lotes-em-uso"></div>
+            <!-- CARD DE PRÉ-VISUALIZAÇÃO APÓS BIPAR -->
+            <div id="preview-lote-box" class="resumo-box escondido">
+                <h4 style="color:var(--accent-blue); margin-bottom:12px;">Confirmar Informações da MP</h4>
+                <div class="resumo-item"><span>Código MP:</span> <strong id="prev-cod">---</strong></div>
+                <div class="resumo-item"><span>Descrição:</span> <strong id="prev-desc">---</strong></div>
+                <div class="resumo-item"><span>Nº do Lote:</span> <strong id="prev-lote" style="color:var(--accent-orange);">---</strong></div>
+                <div class="resumo-item"><span>Peso Cadastrado:</span> <strong id="prev-peso" style="color:var(--success-color);">--- kg</strong></div>
+                <button class="btn-orange" id="btn-confirmar-abastecimento" onclick="confirmarAbastecimentoLote()" style="margin-top:15px;">Gravar Apontamento na OP</button>
+            </div>
         </div>
     </div>
 
-    <!-- ABA 2: DEVOLVER SOBRA -->
+    <!-- ABA 2: DEVOLUÇÃO / TRANSFERÊNCIA -->
     <div id="tela-devolver" class="escondido aba-conteudo">
-        <h2 style="text-align: left; margin-bottom: 20px;">Devolução de Sobras</h2>
+        <h2 style="text-align: left; margin-bottom: 20px;">Devolução / Transferência</h2>
+        
         <div class="card">
-            <h3>Selecione o Lote Retirado da Máquina</h3>
+            <h3>1. Bipar Etiqueta para Devolução</h3>
             <div class="form-group">
-                <label>Filtrar por OP:</label>
-                <input type="text" id="dev-filtro-op" placeholder="Digite a OP..." oninput="carregarListaParaDevolucao()">
+                <label style="color: var(--accent-orange);">Leitura da Etiqueta em Uso:</label>
+                <input type="text" id="dev-barcode" placeholder="Bipa a etiqueta apontada..." onchange="buscarLoteAtivoDevolucao()">
             </div>
-            <div id="lista-para-devolucao"></div>
+
+            <!-- PAINEL DA DEVOLUÇÃO SE CARREGADO -->
+            <div id="painel-devolucao" class="resumo-box escondido">
+                <input type="hidden" id="dev-consumo-id">
+                <h4 style="color:var(--accent-blue); margin-bottom:12px;">MP Localizada na Linha</h4>
+                <div class="resumo-item"><span>OP Atual:</span> <strong id="dev-info-op">---</strong></div>
+                <div class="resumo-item"><span>Código MP:</span> <strong id="dev-info-cod">---</strong></div>
+                <div class="resumo-item"><span>Descrição:</span> <strong id="dev-info-desc">---</strong></div>
+                <div class="resumo-item"><span>Peso Alocado:</span> <strong id="dev-info-peso">--- kg</strong></div>
+
+                <div style="border-top:1px dashed var(--border-color); margin:15px 0;"></div>
+
+                <div class="form-group">
+                    <label>Tipo de Devolução:</label>
+                    <select id="dev-tipo-operacao" onchange="alternarCamposDevolucao()">
+                        <option value="fisica">Devolução Física (Volta para Almoxarifado)</option>
+                        <option value="sistemica">Devolução Sistêmica (Transferir para Outra OP)</option>
+                    </select>
+                </div>
+
+                <!-- CAMPO FÍSICO -->
+                <div id="box-dev-fisica" class="form-group">
+                    <label>Peso Bruto Medido na Balança (kg):</label>
+                    <input type="number" id="dev-peso-manual" step="0.1" placeholder="Informe o peso pesado na balança">
+                    <p style="font-size:11px; color:var(--text-muted); margin-top:4px;">*O peso do tubete será descontado automaticamente pelo sistema.</p>
+                </div>
+
+                <!-- CAMPO SISTÊMICO (TRANSFERÊNCIA) -->
+                <div id="box-dev-sistemica" class="form-group escondido">
+                    <label>Nova Ordem de Produção Destino (OP Y):</label>
+                    <input type="text" id="dev-nova-op" placeholder="Digite a nova OP de destino">
+                    <label style="margin-top:10px;">Quantidade Mantida na Máquina (kg):</label>
+                    <input type="number" id="dev-peso-transferido" step="0.1" placeholder="Sobra mantida para a próxima OP">
+                </div>
+
+                <button class="btn-orange" onclick="executarDevolucao()" style="margin-top:15px;">Finalizar Processo</button>
+            </div>
         </div>
     </div>
 
-    <!-- ABA 3: APONTAR REFUGO -->
+    <!-- ABA 3: REFUGO DE FRALDAS (SCRAP) -->
     <div id="tela-refugo" class="escondido aba-conteudo">
-        <h2 style="text-align: left; margin-bottom: 20px;">Apontamento de Refugo (Scrap)</h2>
+        <h2 style="text-align: left; margin-bottom: 20px;">Apontamento de Refugo</h2>
         <div class="card">
-            <h3>Registrar Fardos/Peças Descartadas</h3>
+            <h3>Registrar Peso Refugado</h3>
+            <div class="form-group"><label>OP:</label><input type="text" id="ref-op" placeholder="Nº da Ordem"></div>
+            <div class="form-group"><label>Máquina:</label><select id="ref-maquina"></select></div>
+            <div class="form-group"><label>Peso Refugado (kg):</label><input type="number" id="ref-peso" step="0.1"></div>
             <div class="form-group">
-                <label>Ordem de Produção (OP):</label>
-                <input type="text" id="ref-op" placeholder="Nº da Ordem">
-            </div>
-            <div class="form-group">
-                <label>Máquina:</label>
-                <select id="ref-maquina"></select>
-            </div>
-            <div class="form-group">
-                <label>Peso Total Refugado (kg):</label>
-                <input type="number" id="ref-peso" step="0.1" placeholder="Ex: 45.5">
-            </div>
-            <div class="form-group">
-                <label>Motivo do Refugo:</label>
+                <label>Tipo de Perda:</label>
                 <select id="ref-motivo">
                     <option value="Setup / Partida">Setup / Partida</option>
                     <option value="Emenda de Bobina">Emenda de Bobina</option>
-                    <option value="Problema de Processo">Problema de Processo</option>
-                    <option value="Defeito de Qualidade">Defeito de Qualidade</option>
+                    <option value="Processo / Parada">Processo / Parada</option>
                 </select>
             </div>
-            <button class="btn-orange" onclick="salvarRefugo()">Gravar Refugo</button>
+            <button class="btn-orange" onclick="salvarRefugo()">Salvar Refugo</button>
         </div>
     </div>
 
-    <!-- ABA 4: VISÃO OP (CONSOLIDAÇÃO TOTVS) -->
+    <!-- ABA 4: VISÃO CONSOLIDADA DA OP -->
     <div id="tela-visao" class="escondido aba-conteudo">
         <h2 style="text-align: left; margin-bottom: 8px;">Consumo Real por OP</h2>
-        <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 24px;">Visão real para envio e validação no TOTVS ERP.</p>
+        <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 24px;">Acumulado real por OP para validação TOTVS.</p>
 
         <div class="table-wrapper">
             <table class="table-premium" id="tabela-visao-op">
@@ -237,7 +265,7 @@
 
     <!-- MENU INFERIOR -->
     <nav class="nav-inferior escondido" id="menu-navegacao">
-        <button class="nav-item ativo" id="nav-abastecer" onclick="navegarPara('abastecer')"><div class="icon">🔗</div>Bipar MP</button>
+        <button class="nav-item ativo" id="nav-abastecer" onclick="navegarPara('abastecer')"><div class="icon">🔗</div>Setar MP</button>
         <button class="nav-item" id="nav-devolver" onclick="navegarPara('devolver')"><div class="icon">⚖️</div>Devolver</button>
         <button class="nav-item" id="nav-refugo" onclick="navegarPara('refugo')"><div class="icon">🗑️</div>Refugo</button>
         <button class="nav-item restrito-lider-adm escondido" id="nav-visao" onclick="navegarPara('visao')"><div class="icon">📊</div>Visão OP</button>
@@ -245,21 +273,6 @@
         <button class="nav-item sair" onclick="sair()"><div class="icon">🚪</div>Sair</button>
     </nav>
 
-</div>
-
-<!-- MODAL: DEVOLUÇÃO -->
-<div id="modal-devolucao-item" class="modal-overlay escondido">
-    <div class="modal-content">
-        <h3>Devolver Sobra da Bobina</h3>
-        <input type="hidden" id="form-dev-id">
-        <div class="form-group">
-            <label>Peso Bruto na Balança (kg):</label>
-            <input type="number" id="form-dev-peso" step="0.1" placeholder="Ex: 450.0">
-        </div>
-        <p style="font-size:11px; color:var(--text-muted);">*O peso do tubete cadastrado no material será descontado automaticamente.</p>
-        <button class="btn-orange" onclick="confirmarDevolucaoSobra()" style="margin-top: 8px;">Confirmar Devolução</button>
-        <button class="btn-dash" style="margin-top:12px; border-color:var(--text-muted); color:var(--text-muted);" onclick="fecharModal('modal-devolucao-item')">Cancelar</button>
-    </div>
 </div>
 
 <!-- MODAL: CADASTRAR MATERIAL -->
