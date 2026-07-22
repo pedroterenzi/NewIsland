@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Unicharm MP - Rastreabilidade</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- Adicionada a biblioteca SheetJS para ler o Excel -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root {
@@ -51,9 +50,10 @@
         
         .btn-small-delete { background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); padding: 10px 14px; border-radius: 10px; font-size: 12px; font-weight: 600; cursor: pointer; transition: 0.2s;}
         
-        .item-list { background: #0f172a; border: 1px solid #1e293b; padding: 18px; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .item-list { background: #0f172a; border: 1px solid #1e293b; padding: 18px; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;}
         
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
         
         .resumo-box { background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.2); padding: 18px; border-radius: 16px; margin-bottom: 20px; }
         .resumo-item { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 8px; color: var(--text-muted);}
@@ -80,20 +80,16 @@
         
         .escondido { display: none !important; }
         
-        .table-wrapper { width: 100%; overflow-x: auto; border-radius: 14px; border: 1px solid var(--border-color); background: #0f172a; }
-        .table-premium { width: 100%; border-collapse: separate; border-spacing: 0; text-align: left; font-size: 13px; white-space: nowrap; }
-        .table-premium th { background: #111827; color: var(--accent-orange); padding: 16px; font-weight: 700; border-bottom: 2px solid #1e293b; text-transform: uppercase; }
-        .table-premium td { padding: 16px; border-bottom: 1px solid #1e293b; color: var(--text-color); }
-        
-        .badge-success { background: rgba(16, 185, 129, 0.1); color: var(--success-color); padding: 6px 10px; border-radius: 8px; font-weight: 700; }
-        .badge-danger { background: rgba(239, 68, 68, 0.1); color: var(--danger-color); padding: 6px 10px; border-radius: 8px; font-weight: 700; }
-        .badge-blue { background: rgba(59, 130, 246, 0.1); color: var(--accent-blue); padding: 6px 10px; border-radius: 8px; font-weight: 700; }
+        .badge-success { background: rgba(16, 185, 129, 0.1); color: var(--success-color); padding: 6px 10px; border-radius: 8px; font-weight: 700; font-size: 12px;}
+        .badge-danger { background: rgba(239, 68, 68, 0.1); color: var(--danger-color); padding: 6px 10px; border-radius: 8px; font-weight: 700; font-size: 12px;}
+        .badge-blue { background: rgba(59, 130, 246, 0.1); color: var(--accent-blue); padding: 6px 10px; border-radius: 8px; font-weight: 700; font-size: 12px;}
         
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); display: flex; justify-content: center; align-items: center; z-index: 2000; padding: 20px; }
         .modal-content { background: linear-gradient(145deg, #111827 0%, #0f172a 100%); border: 1px solid #1e293b; border-radius: 24px; padding: 32px; width: 100%; max-width: 440px; }
 
         @media (max-width: 500px) {
             .grid-2 { grid-template-columns: 1fr; gap: 12px; }
+            .grid-3 { grid-template-columns: 1fr; gap: 8px; }
             .app-container { padding: 12px; }
             .card { padding: 20px; }
         }
@@ -140,14 +136,23 @@
                 <input type="text" id="abs-barcode" placeholder="Bipa o código aqui..." onchange="buscarDetalhesEtiqueta()">
             </div>
 
-            <!-- CARD DE PRÉ-VISUALIZAÇÃO APÓS BIPAR -->
+            <!-- CARD DE PRÉ-VISUALIZAÇÃO E QUANTIDADE -->
             <div id="preview-lote-box" class="resumo-box escondido">
                 <h4 style="color:var(--accent-blue); margin-bottom:12px;">Confirmar Informações da MP</h4>
                 <div class="resumo-item"><span>Código MP:</span> <strong id="prev-cod">---</strong></div>
                 <div class="resumo-item"><span>Descrição:</span> <strong id="prev-desc">---</strong></div>
                 <div class="resumo-item"><span>Nº do Lote:</span> <strong id="prev-lote" style="color:var(--accent-orange);">---</strong></div>
-                <div class="resumo-item"><span>Peso Cadastrado:</span> <strong id="prev-peso" style="color:var(--success-color);">--- kg</strong></div>
-                <button class="btn-orange" id="btn-confirmar-abastecimento" onclick="confirmarAbastecimentoLote()" style="margin-top:15px;">Gravar Apontamento na OP</button>
+                <div class="resumo-item"><span>Peso Disponível no Lote:</span> <strong id="prev-peso" style="color:var(--success-color);">--- kg</strong></div>
+                
+                <div style="border-top:1px dashed var(--border-color); margin:15px 0;"></div>
+                
+                <div class="form-group">
+                    <label style="color: #fff; font-size: 14px;">Quantidade a Apontar (kg):</label>
+                    <input type="number" id="abs-peso-apontar" step="0.1" placeholder="Digite os Kg que pegou (Ex: 180.5)">
+                    <p style="font-size: 11px; color: var(--accent-orange); margin-top: 4px;">*Pode apontar o palete/caixa inteira. A devolução será feita no final.</p>
+                </div>
+
+                <button class="btn-orange" id="btn-confirmar-abastecimento" onclick="confirmarAbastecimentoLote()" style="margin-top:5px;">Gravar Apontamento na OP</button>
             </div>
         </div>
     </div>
@@ -163,44 +168,56 @@
                 <input type="text" id="dev-barcode" placeholder="Bipa a etiqueta apontada..." onchange="buscarLoteAtivoDevolucao()">
             </div>
 
-            <!-- PAINEL DA DEVOLUÇÃO SE CARREGADO -->
+            <!-- PAINEL DA DEVOLUÇÃO -->
             <div id="painel-devolucao" class="resumo-box escondido">
                 <input type="hidden" id="dev-consumo-id">
                 <h4 style="color:var(--accent-blue); margin-bottom:12px;">MP Localizada na Linha</h4>
                 <div class="resumo-item"><span>OP Atual:</span> <strong id="dev-info-op">---</strong></div>
                 <div class="resumo-item"><span>Código MP:</span> <strong id="dev-info-cod">---</strong></div>
                 <div class="resumo-item"><span>Descrição:</span> <strong id="dev-info-desc">---</strong></div>
-                <div class="resumo-item"><span>Peso Alocado:</span> <strong id="dev-info-peso">--- kg</strong></div>
+                <div class="resumo-item"><span>Peso Alocado na OP:</span> <strong id="dev-info-peso">--- kg</strong></div>
 
                 <div style="border-top:1px dashed var(--border-color); margin:15px 0;"></div>
 
                 <div class="form-group">
-                    <label>Tipo de Devolução:</label>
+                    <label>Como você vai devolver?</label>
                     <select id="dev-tipo-operacao" onchange="alternarCamposDevolucao()">
-                        <option value="fisica">Devolução Física (Volta para Almoxarifado)</option>
-                        <option value="sistemica">Devolução Sistêmica (Transferir para Outra OP)</option>
+                        <option value="fisica_parcial">Bobina Parcial (Medir Centímetros)</option>
+                        <option value="fisica_inteira">Bobinas Inteiras (Informar Quantidade)</option>
+                        <option value="fisica_etiqueta">Peso Fechado (Digitar os KG do Palete)</option>
+                        <option value="sistemica">Transferência Sistêmica (Mover para outra OP)</option>
                     </select>
                 </div>
 
-                <!-- CAMPO FÍSICO (CÁLCULO POR CENTÍMETROS) -->
-                <div id="box-dev-fisica" class="form-group">
-                    <label>Diâmetro Externo Medido na Máquina (cm):</label>
+                <!-- 2A. DEVOLUÇÃO PARCIAL (CM) -->
+                <div id="box-dev-fisica-parcial" class="form-group">
+                    <label>Diâmetro Externo da Bobina (cm):</label>
                     <input type="number" id="dev-diam-ext" step="0.1" placeholder="Ex: 42.5" oninput="calcularPesoDevolucao()">
-                    
                     <label style="margin-top: 10px;">Diâmetro do Tubete (cm):</label>
                     <input type="number" id="dev-diam-tub" step="0.1" placeholder="Ex: 9.45" value="9.45" oninput="calcularPesoDevolucao()">
-                    
-                    <!-- Box verde que mostra o resultado ao vivo -->
-                    <div class="resumo-box" style="margin-top: 15px; padding: 16px; background: rgba(16, 185, 129, 0.1); border-color: var(--success-color);">
-                        <div style="font-size: 13px; font-weight: 600; color: var(--success-color); margin-bottom: 4px;">Peso Restante Calculado:</div>
-                        <strong id="dev-peso-calculado" style="color: #fff; font-size: 22px;">0.00 kg</strong>
-                    </div>
-                    
-                    <!-- O valor real calculado vai ficar escondido aqui para ser enviado ao banco -->
-                    <input type="hidden" id="dev-peso-manual">
                 </div>
 
-                <!-- CAMPO SISTÊMICO (TRANSFERÊNCIA) -->
+                <!-- 2B. DEVOLUÇÃO BOBINAS INTEIRAS (QTD) -->
+                <div id="box-dev-fisica-inteira" class="form-group escondido">
+                    <label>Quantidade de Bobinas Inteiras a Devolver:</label>
+                    <input type="number" id="dev-qtd-inteiras" step="1" placeholder="Ex: 4" oninput="calcularPesoDevolucao()">
+                </div>
+
+                <!-- 2C. DEVOLUÇÃO PESO ETIQUETA (KG DIRETO) -->
+                <div id="box-dev-fisica-etiqueta" class="form-group escondido">
+                    <label>Peso Líquido Total a Devolver (kg):</label>
+                    <input type="number" id="dev-peso-etiqueta" step="0.1" placeholder="Ex: 180.5" oninput="calcularPesoDevolucao()">
+                </div>
+
+                <!-- BOX VERDE DE RESULTADO DO CÁLCULO FÍSICO -->
+                <div id="box-resultado-fisico" class="resumo-box" style="margin-top: 15px; padding: 16px; background: rgba(16, 185, 129, 0.1); border-color: var(--success-color);">
+                    <div style="font-size: 13px; font-weight: 600; color: var(--success-color); margin-bottom: 4px;">Peso Líquido Retornando ao Lote:</div>
+                    <strong id="dev-peso-calculado" style="color: #fff; font-size: 22px;">0.00 kg</strong>
+                </div>
+                
+                <input type="hidden" id="dev-peso-manual">
+
+                <!-- 2D. CAMPO SISTÊMICO (TRANSFERÊNCIA) -->
                 <div id="box-dev-sistemica" class="form-group escondido">
                     <label>Nova Ordem de Produção Destino (OP Y):</label>
                     <input type="text" id="dev-nova-op" placeholder="Digite a nova OP de destino">
@@ -233,24 +250,23 @@
         </div>
     </div>
 
-    <!-- ABA 4: VISÃO CONSOLIDADA DA OP -->
+    <!-- ABA 4: VISÃO DETALHADA DA OP -->
     <div id="tela-visao" class="escondido aba-conteudo">
-        <h2 style="text-align: left; margin-bottom: 8px;">Consumo Real por OP</h2>
-        <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 24px;">Acumulado real por OP para validação TOTVS.</p>
+        <h2 style="text-align: left; margin-bottom: 8px;">Visão Detalhada da OP</h2>
+        <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 24px;">Pesquise uma Ordem de Produção para ver todos os materiais bipados.</p>
 
-        <div class="table-wrapper">
-            <table class="table-premium" id="tabela-visao-op">
-                <thead>
-                    <tr>
-                        <th>OP</th>
-                        <th>Máq</th>
-                        <th>Lotes Bipados</th>
-                        <th>Consumo Real (kg)</th>
-                        <th>Refugo (kg)</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
+        <div class="card">
+            <div class="form-group">
+                <label>Pesquisar OP:</label>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="busca-visao-op" placeholder="Ex: OP-2026-001" style="flex: 1;">
+                    <button class="btn-blue" style="width: auto; padding: 0 20px;" onclick="buscarDetalhesVisaoOP()">Buscar</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="resultado-visao-op" class="escondido">
+            <!-- Os cards de detalhe da OP serão injetados aqui -->
         </div>
     </div>
 
@@ -305,7 +321,7 @@
 
 </div>
 
-<!-- MODAL: CADASTRAR MATERIAL -->
+<!-- MODAL CADASTRAR MATERIAL -->
 <div id="modal-material" class="modal-overlay escondido">
     <div class="modal-content">
         <h3>Cadastrar Material</h3>
@@ -320,28 +336,27 @@
                 <option value="lycra">Lycra / Fio</option>
             </select>
         </div>
-        <div class="form-group"><label>Peso Tubete (kg):</label><input type="number" id="form-mat-tubete" step="0.1" value="0.0"></div>
-        <div class="form-group"><label>Peso de 1 Bobina (kg):</label><input type="number" id="form-mat-peso-uni" step="0.1" placeholder="Ex: 23.8"></div>
+        <div class="form-group"><label>Peso de 1 Bobina Líquida (kg):</label><input type="number" id="form-mat-peso-uni" step="0.1" placeholder="Ex: 23.8"></div>
         <div class="form-group"><label>Fator de Conversão (Variável Raio):</label><input type="number" id="form-mat-fator" step="0.00000001" placeholder="Ex: 0.013379342"></div>
         <button class="btn-blue" onclick="salvarMaterial()" style="margin-top: 8px;">Salvar Material</button>
         <button class="btn-dash" style="margin-top:12px; border-color:var(--text-muted); color:var(--text-muted);" onclick="fecharModal('modal-material')">Cancelar</button>
     </div>
 </div>
 
-<!-- MODAL: CADASTRAR LOTE NO ESTOQUE -->
+<!-- MODAL CADASTRAR LOTE -->
 <div id="modal-lote" class="modal-overlay escondido">
     <div class="modal-content">
         <h3>Dar Entrada de Bobina/Lote</h3>
         <div class="form-group"><label>Código de Barras da Etiqueta:</label><input type="text" id="form-lot-barcode"></div>
         <div class="form-group"><label>Código Material:</label><select id="form-lot-mat"></select></div>
         <div class="form-group"><label>Lote Fornecedor:</label><input type="text" id="form-lot-forn"></div>
-        <div class="form-group"><label>Peso Inicial Bruto (kg):</label><input type="number" id="form-lot-peso" step="0.1"></div>
+        <div class="form-group"><label>Peso Inicial (kg):</label><input type="number" id="form-lot-peso" step="0.1"></div>
         <button class="btn-blue" onclick="salvarLoteEstoque()" style="margin-top: 8px;">Entrar no Estoque</button>
         <button class="btn-dash" style="margin-top:12px; border-color:var(--text-muted); color:var(--text-muted);" onclick="fecharModal('modal-lote')">Cancelar</button>
     </div>
 </div>
 
-<!-- MODAL: CADASTRAR MÁQUINA -->
+<!-- MODAL CADASTRAR MÁQUINA -->
 <div id="modal-maq" class="modal-overlay escondido">
     <div class="modal-content">
         <h3>Cadastrar Máquina</h3>
