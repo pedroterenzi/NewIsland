@@ -105,6 +105,21 @@ def inicializar_banco():
             );
         """)
 
+        # 7. NOVO: Histórico Geral de Movimentações (Auditoria)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS historico_movimentacoes (
+                id SERIAL PRIMARY KEY,
+                ordem_producao VARCHAR(100) NOT NULL,
+                maquina_numero INT,
+                codigo_barras_lote VARCHAR(100),
+                tipo_movimentacao VARCHAR(100) NOT NULL,
+                quantidade_kg NUMERIC(12,3) NOT NULL,
+                operador VARCHAR(255) NOT NULL,
+                data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                detalhes TEXT
+            );
+        """)
+
         # ALTERAÇÃO AUTOMÁTICA DE COLUNAS EXISTENTES
         try:
             cursor.execute("ALTER TABLE master_materiais ALTER COLUMN peso_tubete_padrao TYPE NUMERIC(12,3);")
@@ -114,6 +129,7 @@ def inicializar_banco():
             cursor.execute("ALTER TABLE consumo_op_lote ALTER COLUMN peso_devolvido TYPE NUMERIC(12,3);")
             cursor.execute("ALTER TABLE consumo_op_lote ALTER COLUMN consumo_real TYPE NUMERIC(12,3);")
             cursor.execute("ALTER TABLE apontamento_refugo ALTER COLUMN peso_refugo_kg TYPE NUMERIC(12,3);")
+            cursor.execute("ALTER TABLE historico_movimentacoes ALTER COLUMN quantidade_kg TYPE NUMERIC(12,3);")
             cursor.execute("ALTER TABLE master_materiais ADD COLUMN IF NOT EXISTS peso_unitario_kg NUMERIC(12,3) DEFAULT 0.000;")
             cursor.execute("ALTER TABLE master_materiais ADD COLUMN IF NOT EXISTS fator_conversao NUMERIC(15,8) DEFAULT 0.00000000;")
         except Exception as err_alter:
@@ -335,11 +351,18 @@ def confirmar_abastecimento(obj: ModelAbastecerConfirmar):
         if peso_apontado > peso_disponivel:
             raise HTTPException(status_code=400, detail=f"Peso apontado maior que o saldo disponível no lote ({peso_disponivel} kg).")
 
+        # Insere o Consumo
         cursor.execute("""
             INSERT INTO consumo_op_lote (ordem_producao, maquina_numero, codigo_barras_lote, peso_alocado, operador)
             VALUES (%s, %s, %s, %s, %s) RETURNING id;
-        """, (obj.ordem_producao.strip(), obj.maquina_numero, obj.codigo_barras_lote.strip(), peso_apontado, obj.operador))
+        """, (obj.ordem_producao.strip(), obj.maquina_numero, obj.codigo_barras_lote.strip(), peso_apontado, obj.operador.strip()))
         
+        # Grava Histórico de Movimentação (AUDITORIA)
+        cursor.execute("""
+            INSERT INTO historico_movimentacoes (ordem_producao, maquina_numero, codigo_barras_lote, tipo_movimentacao, quantidade_kg, operador, detalhes)
+            VALUES (%s, %s, %s, 'ABASTECIMENTO', %s, %s, 'Alocação de MP na Máquina')
+        """, (obj.ordem_producao.strip(), obj.maquina_numero, obj.codigo_barras_lote.strip(), peso_apontado, obj.operador.strip()))
+
         novo_peso_lote = peso_disponivel - peso_apontado
         novo_status = 'em_estoque' if novo_peso_lote > 0 else 'consumido'
         
@@ -400,6 +423,12 @@ def devolver_sobra_fisica(obj: ModelDevolucaoFisica):
             WHERE codigo_barras_lote = %s;
         """, (sobra_liquida, consumo['codigo_barras_lote']))
 
+        # Grava Histórico de Movimentação (AUDITORIA)
+        cursor.execute("""
+            INSERT INTO historico_movimentacoes (ordem_producao, maquina_numero, codigo_barras_lote, tipo_movimentacao, quantidade_kg, operador, detalhes)
+            VALUES (%s, %s, %s, 'DEVOLUÇÃO FÍSICA', %s, %s, 'Retorno do material para o Estoque Geral')
+        """, (consumo['ordem_producao'], consumo['maquina_numero'], consumo['codigo_barras_lote'], sobra_liquida, obj.operador.strip()))
+
         conn.commit()
         cursor.close()
         return {
@@ -447,7 +476,18 @@ def transferir_sistemico_op(obj: ModelDevolucaoSistemica):
         cursor.execute("""
             INSERT INTO consumo_op_lote (ordem_producao, maquina_numero, codigo_barras_lote, peso_alocado, operador)
             VALUES (%s, %s, %s, %s, %s);
-        """, (obj.nova_ordem_destino.strip(), consumo_origem['maquina_numero'], consumo_origem['codigo_barras_lote'], peso_transferido, obj.operador))
+        """, (obj.nova_ordem_destino.strip(), consumo_origem['maquina_numero'], consumo_origem['codigo_barras_lote'], peso_transferido, obj.operador.strip()))
+
+        # Grava Histórico de Movimentação DUPLO (Saída e Entrada)
+        cursor.execute("""
+            INSERT INTO historico_movimentacoes (ordem_producao, maquina_numero, codigo_barras_lote, tipo_movimentacao, quantidade_kg, operador, detalhes)
+            VALUES (%s, %s, %s, 'TRANSFERÊNCIA (SAÍDA)', %s, %s, %s)
+        """, (consumo_origem['ordem_producao'], consumo_origem['maquina_numero'], consumo_origem['codigo_barras_lote'], peso_transferido, obj.operador.strip(), f"Enviado para a OP {obj.nova_ordem_destino.strip()}"))
+
+        cursor.execute("""
+            INSERT INTO historico_movimentacoes (ordem_producao, maquina_numero, codigo_barras_lote, tipo_movimentacao, quantidade_kg, operador, detalhes)
+            VALUES (%s, %s, %s, 'TRANSFERÊNCIA (ENTRADA)', %s, %s, %s)
+        """, (obj.nova_ordem_destino.strip(), consumo_origem['maquina_numero'], consumo_origem['codigo_barras_lote'], peso_transferido, obj.operador.strip(), f"Recebido da OP {consumo_origem['ordem_producao']}"))
 
         conn.commit()
         cursor.close()
@@ -474,7 +514,14 @@ def apontar_refugo(obj: ModelRefugo):
         cursor.execute("""
             INSERT INTO apontamento_refugo (ordem_producao, maquina_numero, peso_refugo_kg, tipo_refugo, operador)
             VALUES (%s, %s, %s, %s, %s);
-        """, (obj.ordem_producao, obj.maquina_numero, obj.peso_refugo_kg, obj.tipo_refugo, obj.operador))
+        """, (obj.ordem_producao, obj.maquina_numero, obj.peso_refugo_kg, obj.tipo_refugo, obj.operador.strip()))
+        
+        # Grava Histórico de Movimentação (AUDITORIA)
+        cursor.execute("""
+            INSERT INTO historico_movimentacoes (ordem_producao, maquina_numero, codigo_barras_lote, tipo_movimentacao, quantidade_kg, operador, detalhes)
+            VALUES (%s, %s, NULL, 'REFUGO', %s, %s, %s)
+        """, (obj.ordem_producao, obj.maquina_numero, obj.peso_refugo_kg, obj.operador.strip(), obj.tipo_refugo))
+
         conn.commit()
         cursor.close()
         return {"status": "sucesso", "mensagem": "Refugo registrado com sucesso!"}
@@ -515,6 +562,26 @@ def visao_ordem_detalhe(op: str):
     finally:
         if conn:
             conn.close()
+
+# --- NOVO: HISTÓRICO DE MOVIMENTAÇÕES (AUDITORIA) ---
+@app.get("/historico-movimentacoes/{op}")
+def historico_movimentacoes_por_op(op: str):
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("""
+            SELECT * FROM historico_movimentacoes 
+            WHERE ordem_producao = %s 
+            ORDER BY data_hora DESC;
+        """, (op.strip(),))
+        dados = cursor.fetchall()
+        cursor.close()
+        return dados
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: conn.close()
 
 # --- ADMIN E CADASTROS ---
 
@@ -615,10 +682,8 @@ def importar_lotes_massa(lotes: List[ItemImportacaoMassa]):
             cod_mat = item.codigo_material.strip()
             barcode = item.codigo_barras_lote.strip()
             
-            # Pega a descricao vinda do Excel se tiver, senao coloca padrão
             desc_mat = item.descricao_material.strip() if item.descricao_material else f"Material {cod_mat} (Importado)"
 
-            # AGORA ELE ATUALIZA A DESCRIÇÃO SE JÁ EXISTIR NO BANCO
             cursor.execute("""
                 INSERT INTO master_materiais (codigo_material, descricao, tipo_material, peso_tubete_padrao, peso_unitario_kg, fator_conversao)
                 VALUES (%s, %s, 'bobina', 0.00, 0.00, 0.00)
