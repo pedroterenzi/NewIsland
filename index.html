@@ -316,10 +316,10 @@
             <button class="btn-blue" onclick="processarPlanilhaParametros()" style="background: var(--success-color); box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);">Processar Fatores (Excel)</button>
         </div>
 
-        <!-- IMPORTADOR AUTOMÁTICO DO XML SB8 DO TOTVS -->
+        <!-- IMPORTADOR DE SALDOS POR LOTE (EXCEL) -->
         <div class="card">
-            <h3>📥 Importar XML SB8 (TOTVS Protheus)</h3>
-            <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">Selecione o arquivo XML exportado da rotina SB8 do TOTVS Protheus.</p>
+            <h3>📥 Importar Saldos por Lote (Excel)</h3>
+            <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">Selecione o arquivo Excel de Saldos por Lote exportado do TOTVS (ex: <b>mtr425.xlsx</b>).</p>
             
             <div style="margin-bottom: 15px; display: flex; align-items: flex-start; gap: 10px; background: rgba(239, 68, 68, 0.05); padding: 12px; border-radius: 8px; border: 1px solid rgba(239, 68, 68, 0.2);">
                 <input type="checkbox" id="check-limpar-estoque" style="width: 20px; height: 20px; margin-top: 2px; cursor: pointer;">
@@ -330,9 +330,9 @@
             </div>
 
             <div class="form-group">
-                <input type="file" id="upload-xml-totvs" accept=".xml,.ssml" style="padding:10px;">
+                <input type="file" id="upload-excel-lotes" accept=".xlsx,.xls" style="padding:10px;">
             </div>
-            <button class="btn-blue" onclick="processarArquivoTotvs()">Processar e Importar Lotes Ativos</button>
+            <button class="btn-blue" onclick="processarArquivoLotesExcel()">Processar e Importar Lotes Ativos</button>
             <div style="border-top:1px dashed var(--border-color); margin:15px 0;"></div>
             <button class="btn-dash" onclick="abrirModal('modal-lote')">+ Cadastrar Nova Bobina/Lote Manualmente</button>
         </div>
