@@ -3,6 +3,7 @@ const API_URL = "https://newisland-zzhk.onrender.com";
 let usuarioLogado = null;
 let MESTRE_MATERIAIS = [], MESTRE_MAQUINAS = [];
 let loteConsultadoTemp = null;
+let consumoAtivoDevolucao = null; // Variável para segurar os dados na devolução
 
 async function executarLogin() {
     const login = document.getElementById('login-usuario').value.trim();
@@ -182,13 +183,13 @@ async function buscarLoteAtivoDevolucao() {
     try {
         const res = await fetch(`${API_URL}/consumo/buscar-ativo/${encodeURIComponent(barcode)}`);
         if (res.ok) {
-            const consumo = await res.json();
+            consumoAtivoDevolucao = await res.json();
             
-            document.getElementById('dev-consumo-id').value = consumo.consumo_id;
-            document.getElementById('dev-info-op').innerText = consumo.ordem_producao;
-            document.getElementById('dev-info-cod').innerText = consumo.codigo_material;
-            document.getElementById('dev-info-desc').innerText = consumo.descricao;
-            document.getElementById('dev-info-peso').innerText = `${consumo.peso_alocado} kg`;
+            document.getElementById('dev-consumo-id').value = consumoAtivoDevolucao.consumo_id;
+            document.getElementById('dev-info-op').innerText = consumoAtivoDevolucao.ordem_producao;
+            document.getElementById('dev-info-cod').innerText = consumoAtivoDevolucao.codigo_material;
+            document.getElementById('dev-info-desc').innerText = consumoAtivoDevolucao.descricao;
+            document.getElementById('dev-info-peso').innerText = `${consumoAtivoDevolucao.peso_alocado} kg`;
             
             document.getElementById('painel-devolucao').classList.remove('escondido');
             alternarCamposDevolucao();
@@ -217,6 +218,32 @@ function alternarCamposDevolucao() {
     }
 }
 
+function calcularPesoDevolucao() {
+    if (!consumoAtivoDevolucao) return;
+
+    const diamExtCm = parseFloat(document.getElementById('dev-diam-ext').value) || 0;
+    const diamTubCm = parseFloat(document.getElementById('dev-diam-tub').value) || 0;
+    const fatorConversao = parseFloat(consumoAtivoDevolucao.fator_conversao) || 0;
+
+    if (diamExtCm > 0 && diamTubCm > 0 && fatorConversao > 0) {
+        // Encontra o Raio dividindo o Diâmetro por 2
+        const raioExt = diamExtCm / 2;
+        const raioTub = diamTubCm / 2;
+        
+        // Aplicação exata da fórmula matemática
+        const areaCoroa = (Math.pow(raioExt, 2) - Math.pow(raioTub, 2)) * 3.1416;
+        let pesoEstimado = areaCoroa * fatorConversao;
+        
+        if (pesoEstimado < 0) pesoEstimado = 0;
+
+        document.getElementById('dev-peso-calculado').innerText = pesoEstimado.toFixed(2) + ' kg';
+        document.getElementById('dev-peso-manual').value = pesoEstimado.toFixed(2);
+    } else {
+        document.getElementById('dev-peso-calculado').innerText = '0.00 kg';
+        document.getElementById('dev-peso-manual').value = '';
+    }
+}
+
 async function executarDevolucao() {
     const consumoId = parseInt(document.getElementById('dev-consumo-id').value);
     const tipo = document.getElementById('dev-tipo-operacao').value;
@@ -224,7 +251,7 @@ async function executarDevolucao() {
     if (tipo === 'fisica') {
         const pesoManual = parseFloat(document.getElementById('dev-peso-manual').value);
         if (isNaN(pesoManual) || pesoManual < 0) {
-            return alert("Informe o peso medido na balança!");
+            return alert("Informe as medidas corretamente para calcular o peso!");
         }
 
         try {
@@ -283,10 +310,14 @@ async function executarDevolucao() {
 
 function resetarTelaDevolucao() {
     document.getElementById('dev-barcode').value = '';
+    document.getElementById('dev-diam-ext').value = '';
+    document.getElementById('dev-diam-tub').value = '9.45';
+    document.getElementById('dev-peso-calculado').innerText = '0.00 kg';
     document.getElementById('dev-peso-manual').value = '';
     document.getElementById('dev-nova-op').value = '';
     document.getElementById('dev-peso-transferido').value = '';
     document.getElementById('painel-devolucao').classList.add('escondido');
+    consumoAtivoDevolucao = null;
 }
 
 // --- FLUXO 3: REFUGO ---
@@ -375,7 +406,9 @@ async function salvarMaterial() {
         codigo_material: document.getElementById('form-mat-cod').value.trim(),
         descricao: document.getElementById('form-mat-desc').value.trim(),
         tipo_material: document.getElementById('form-mat-tipo').value,
-        peso_tubete_padrao: parseFloat(document.getElementById('form-mat-tubete').value || 0)
+        peso_tubete_padrao: parseFloat(document.getElementById('form-mat-tubete').value || 0),
+        peso_unitario_kg: parseFloat(document.getElementById('form-mat-peso-uni').value || 0),
+        fator_conversao: parseFloat(document.getElementById('form-mat-fator').value || 0)
     };
 
     await fetch(`${API_URL}/admin/materiais`, {
