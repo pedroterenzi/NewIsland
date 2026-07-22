@@ -1,7 +1,8 @@
 const API_URL = "https://newisland-zzhk.onrender.com";
 
 let usuarioLogado = null;
-let MESTRE_MATERIAIS = [], MESTRE_MAQUINAS = [];
+let MESTRE_MATERIAIS = [];
+let MESTRE_MAQUINAS = [];
 let loteConsultadoTemp = null;
 let consumoAtivoDevolucao = null; 
 
@@ -11,7 +12,8 @@ async function executarLogin() {
     if (!login || !senha) return alert("Insira suas credenciais.");
     
     const btn = document.getElementById('btn-entrar'); 
-    btn.innerText = "Conectando ao banco..."; btn.disabled = true;
+    btn.innerText = "Conectando ao banco..."; 
+    btn.disabled = true;
 
     try {
         const res = await fetch(`${API_URL}/usuarios/auth`, {
@@ -25,15 +27,19 @@ async function executarLogin() {
             await inicializarPainel();
         } else {
             alert("Credenciais incorretas.");
-            btn.innerText = "Acessar Sistema"; btn.disabled = false;
+            btn.innerText = "Acessar Sistema"; 
+            btn.disabled = false;
         }
     } catch (e) {
         alert("Erro de conexão com o servidor. Tente novamente.");
-        btn.innerText = "Acessar Sistema"; btn.disabled = false;
+        btn.innerText = "Acessar Sistema"; 
+        btn.disabled = false;
     }
 }
 
-function sair() { location.reload(); }
+function sair() { 
+    location.reload(); 
+}
 
 async function inicializarPainel() {
     document.getElementById('tela-login').classList.add('escondido');
@@ -109,7 +115,7 @@ function fecharModal(id) {
     if (modal) modal.classList.add('escondido'); 
 }
 
-// --- FLUXO 1: ABASTECER (CONSULTAR -> CONFIRMAR) ---
+// --- FLUXO 1: ABASTECER ---
 
 async function buscarDetalhesEtiqueta() {
     const barcode = document.getElementById('abs-barcode').value.trim();
@@ -125,7 +131,6 @@ async function buscarDetalhesEtiqueta() {
             document.getElementById('prev-lote').innerText = loteConsultadoTemp.lote_fornecedor;
             document.getElementById('prev-peso').innerText = `${loteConsultadoTemp.peso_atual} kg`;
             
-            // Sugere apontar o total disponível no lote
             document.getElementById('abs-peso-apontar').value = loteConsultadoTemp.peso_atual;
             
             document.getElementById('preview-lote-box').classList.remove('escondido');
@@ -145,15 +150,9 @@ async function confirmarAbastecimentoLote() {
     const maquina = parseInt(document.getElementById('abs-maquina').value);
     const pesoApontado = parseFloat(document.getElementById('abs-peso-apontar').value);
 
-    if (!op) {
-        return alert("Digite a Ordem de Produção (OP) antes de confirmar!");
-    }
-    if (!loteConsultadoTemp) {
-        return alert("Bipa a etiqueta de matéria-prima primeiro!");
-    }
-    if (isNaN(pesoApontado) || pesoApontado <= 0) {
-        return alert("Digite um peso válido para apontar na máquina!");
-    }
+    if (!op) return alert("Digite a Ordem de Produção (OP) antes de confirmar!");
+    if (!loteConsultadoTemp) return alert("Bipa a etiqueta de matéria-prima primeiro!");
+    if (isNaN(pesoApontado) || pesoApontado <= 0) return alert("Digite um peso válido para apontar!");
     if (pesoApontado > parseFloat(loteConsultadoTemp.peso_atual)) {
         return alert(`Você não pode apontar ${pesoApontado}kg pois o lote tem apenas ${loteConsultadoTemp.peso_atual}kg disponíveis!`);
     }
@@ -173,10 +172,7 @@ async function confirmarAbastecimentoLote() {
 
         if (res.ok) {
             alert(`Sucesso! ${pesoApontado} kg do Lote ${loteConsultadoTemp.lote_fornecedor} alocados na OP ${op}.`);
-            
-            // Sugere a mesma OP na tela de devolução para facilitar a vida do operador
             document.getElementById('dev-op').value = op;
-
             document.getElementById('abs-barcode').value = '';
             document.getElementById('abs-peso-apontar').value = '';
             document.getElementById('preview-lote-box').classList.add('escondido');
@@ -275,7 +271,6 @@ function calcularPesoDevolucao() {
     document.getElementById('dev-peso-manual').value = pesoEstimado.toFixed(2);
 }
 
-// Calculadora de apoio para Transferência Sistêmica
 function calcularPesoTransferencia() {
     if (!consumoAtivoDevolucao) return;
 
@@ -340,7 +335,6 @@ async function executarDevolucao() {
         } catch (e) { alert("Erro ao executar devolução física."); }
 
     } else {
-        // SISTÊMICA (TRANSFERÊNCIA)
         const novaOP = document.getElementById('dev-nova-op').value.trim();
         const pesoTransferido = parseFloat(document.getElementById('dev-peso-transferido').value);
 
@@ -426,7 +420,7 @@ async function salvarRefugo() {
     }
 }
 
-// --- NOVA VISÃO OP (AGRUPADA/RESUMO POR LOTE) ---
+// --- VISÃO OP DETALHADA ---
 
 async function buscarDetalhesVisaoOP() {
     const op = document.getElementById('busca-visao-op').value.trim();
@@ -570,7 +564,8 @@ async function deletarRegistro(tabela, id) {
     renderizarGestao();
 }
 
-// --- IMPORTADOR DA PLANILHA DE PARÂMETROS EXCEL ---
+// --- IMPORTADOR DA PLANILHA EXCEL DE PARÂMETROS ---
+
 function processarPlanilhaParametros() {
     const fileInput = document.getElementById('upload-excel-param');
     if (!fileInput || !fileInput.files.length) return alert("Selecione o arquivo Excel de parâmetros!");
@@ -642,7 +637,8 @@ function processarPlanilhaParametros() {
     reader.readAsArrayBuffer(file);
 }
 
-// --- PARSER E IMPORTADOR NATIVO DO XML SB8 DO TOTVS PROTHEUS (ATUALIZADO) ---
+// --- PARSER E IMPORTADOR NATIVO DO XML SB8 DO TOTVS PROTHEUS ---
+
 function tratarNumeroTotvs(valorTexto) {
     if (!valorTexto) return 0.0;
     let str = String(valorTexto).trim();
@@ -663,7 +659,7 @@ function processarArquivoTotvs() {
 
     reader.onload = async function(e) {
         const text = e.target.result;
-        const lotesAgrupados = {}; // Objeto para somar os armazéns do mesmo lote
+        const lotesAgrupados = {}; 
         let ignoradosZerados = 0;
 
         try {
@@ -710,7 +706,6 @@ function processarArquivoTotvs() {
                         const pesoDisponivel = tratarNumeroTotvs(saldoTexto);
 
                         if (pesoDisponivel > 0) {
-                            // AGRUPAMENTO: Soma todos os saldos de diferentes armazéns num único lote
                             if (!lotesAgrupados[loteNosso]) {
                                 lotesAgrupados[loteNosso] = {
                                     codigo_barras_lote: loteNosso, 
@@ -727,10 +722,9 @@ function processarArquivoTotvs() {
                 }
             }
 
-            // Transforma o objeto agrupado de volta num array limpo para mandar pra API
             const listaLotes = Object.values(lotesAgrupados).map(l => ({
                 ...l,
-                peso_inicial: parseFloat(l.peso_inicial.toFixed(3)) // Garante que a soma não dê erro de dízima (ex: 48.7000001)
+                peso_inicial: parseFloat(l.peso_inicial.toFixed(3)) 
             }));
 
             if (listaLotes.length === 0) {
@@ -757,10 +751,6 @@ function processarArquivoTotvs() {
             console.error(err);
             alert("Erro ao ler o arquivo XML. Certifique-se de que é a exportação original da tabela SB8.");
         }
-    };
-
-    reader.readAsText(file, "UTF-8");
-}
     };
 
     reader.readAsText(file, "UTF-8");
