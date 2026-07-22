@@ -170,6 +170,12 @@ class ModelRefugo(BaseModel):
     tipo_refugo: str
     operador: str
 
+class ItemImportacaoMassa(BaseModel):
+    codigo_barras_lote: str
+    codigo_material: str
+    lote_fornecedor: str
+    peso_inicial: float
+
 # --- AUTENTICAÇÃO E MESTRES ---
 @app.post("/usuarios/auth")
 def autenticar(obj: ModelAuth):
@@ -504,6 +510,47 @@ def cadastrar_lote(l: ModelLoteEstoque):
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
+
+# --- ENDPOINT IMPORTAÇÃO EM MASSA (XML TOTVS SB8) ---
+@app.post("/admin/lotes/importar-massa")
+def importar_lotes_massa(lotes: List[ItemImportacaoMassa]):
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cont_importados = 0
+
+        for item in lotes:
+            cod_mat = item.codigo_material.strip()
+            barcode = item.codigo_barras_lote.strip()
+
+            # 1. Garante que o material exista no cadastro mestre para evitar erro de Foreign Key
+            cursor.execute("""
+                INSERT INTO master_materiais (codigo_material, descricao, tipo_material, peso_tubete_padrao)
+                VALUES (%s, %s, 'bobina', 0.00)
+                ON CONFLICT (codigo_material) DO NOTHING;
+            """, (cod_mat, f"Material {cod_mat} (TOTVS)"))
+
+            # 2. Insere ou atualiza o saldo do lote na tabela lotes_estoque
+            cursor.execute("""
+                INSERT INTO lotes_estoque (codigo_barras_lote, codigo_material, lote_fornecedor, peso_inicial, peso_atual, status)
+                VALUES (%s, %s, %s, %s, %s, 'em_estoque')
+                ON CONFLICT (codigo_barras_lote) 
+                DO UPDATE SET peso_inicial = EXCLUDED.peso_inicial,
+                              peso_atual = EXCLUDED.peso_inicial,
+                              status = 'em_estoque';
+            """, (barcode, cod_mat, item.lote_fornecedor.strip(), item.peso_inicial, item.peso_inicial))
+            
+            cont_importados += 1
+
+        conn.commit()
+        cursor.close()
+        return {"status": "sucesso", "importados": cont_importados}
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: conn.close()
 
 @app.post("/admin/maquinas")
 def criar_maquina(m: ModelMaquina):
