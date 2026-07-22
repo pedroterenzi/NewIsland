@@ -1,8 +1,7 @@
 const API_URL = "https://newisland-zzhk.onrender.com";
 
 let usuarioLogado = null;
-let MESTRE_MATERIAIS = [];
-let MESTRE_MAQUINAS = [];
+let MESTRE_MATERIAIS = [], MESTRE_MAQUINAS = [];
 let loteConsultadoTemp = null;
 let consumoAtivoDevolucao = null; 
 
@@ -12,8 +11,7 @@ async function executarLogin() {
     if (!login || !senha) return alert("Insira suas credenciais.");
     
     const btn = document.getElementById('btn-entrar'); 
-    btn.innerText = "Conectando ao banco..."; 
-    btn.disabled = true;
+    btn.innerText = "Conectando ao banco..."; btn.disabled = true;
 
     try {
         const res = await fetch(`${API_URL}/usuarios/auth`, {
@@ -27,19 +25,15 @@ async function executarLogin() {
             await inicializarPainel();
         } else {
             alert("Credenciais incorretas.");
-            btn.innerText = "Acessar Sistema"; 
-            btn.disabled = false;
+            btn.innerText = "Acessar Sistema"; btn.disabled = false;
         }
     } catch (e) {
         alert("Erro de conexão com o servidor. Tente novamente.");
-        btn.innerText = "Acessar Sistema"; 
-        btn.disabled = false;
+        btn.innerText = "Acessar Sistema"; btn.disabled = false;
     }
 }
 
-function sair() { 
-    location.reload(); 
-}
+function sair() { location.reload(); }
 
 async function inicializarPainel() {
     document.getElementById('tela-login').classList.add('escondido');
@@ -115,7 +109,7 @@ function fecharModal(id) {
     if (modal) modal.classList.add('escondido'); 
 }
 
-// --- FLUXO 1: ABASTECER ---
+// --- FLUXO 1: ABASTECER (CONSULTAR -> CONFIRMAR) ---
 
 async function buscarDetalhesEtiqueta() {
     const barcode = document.getElementById('abs-barcode').value.trim();
@@ -131,6 +125,7 @@ async function buscarDetalhesEtiqueta() {
             document.getElementById('prev-lote').innerText = loteConsultadoTemp.lote_fornecedor;
             document.getElementById('prev-peso').innerText = `${loteConsultadoTemp.peso_atual} kg`;
             
+            // Sugere apontar o total disponível no lote
             document.getElementById('abs-peso-apontar').value = loteConsultadoTemp.peso_atual;
             
             document.getElementById('preview-lote-box').classList.remove('escondido');
@@ -150,9 +145,15 @@ async function confirmarAbastecimentoLote() {
     const maquina = parseInt(document.getElementById('abs-maquina').value);
     const pesoApontado = parseFloat(document.getElementById('abs-peso-apontar').value);
 
-    if (!op) return alert("Digite a Ordem de Produção (OP) antes de confirmar!");
-    if (!loteConsultadoTemp) return alert("Bipa a etiqueta de matéria-prima primeiro!");
-    if (isNaN(pesoApontado) || pesoApontado <= 0) return alert("Digite um peso válido para apontar!");
+    if (!op) {
+        return alert("Digite a Ordem de Produção (OP) antes de confirmar!");
+    }
+    if (!loteConsultadoTemp) {
+        return alert("Bipa a etiqueta de matéria-prima primeiro!");
+    }
+    if (isNaN(pesoApontado) || pesoApontado <= 0) {
+        return alert("Digite um peso válido para apontar na máquina!");
+    }
     if (pesoApontado > parseFloat(loteConsultadoTemp.peso_atual)) {
         return alert(`Você não pode apontar ${pesoApontado}kg pois o lote tem apenas ${loteConsultadoTemp.peso_atual}kg disponíveis!`);
     }
@@ -172,7 +173,10 @@ async function confirmarAbastecimentoLote() {
 
         if (res.ok) {
             alert(`Sucesso! ${pesoApontado} kg do Lote ${loteConsultadoTemp.lote_fornecedor} alocados na OP ${op}.`);
+            
+            // Sugere a mesma OP na tela de devolução para facilitar a vida do operador
             document.getElementById('dev-op').value = op;
+
             document.getElementById('abs-barcode').value = '';
             document.getElementById('abs-peso-apontar').value = '';
             document.getElementById('preview-lote-box').classList.add('escondido');
@@ -271,6 +275,7 @@ function calcularPesoDevolucao() {
     document.getElementById('dev-peso-manual').value = pesoEstimado.toFixed(2);
 }
 
+// Calculadora de apoio para Transferência Sistêmica
 function calcularPesoTransferencia() {
     if (!consumoAtivoDevolucao) return;
 
@@ -335,6 +340,7 @@ async function executarDevolucao() {
         } catch (e) { alert("Erro ao executar devolução física."); }
 
     } else {
+        // SISTÊMICA (TRANSFERÊNCIA)
         const novaOP = document.getElementById('dev-nova-op').value.trim();
         const pesoTransferido = parseFloat(document.getElementById('dev-peso-transferido').value);
 
@@ -637,7 +643,7 @@ function processarPlanilhaParametros() {
     reader.readAsArrayBuffer(file);
 }
 
-// --- PARSER E IMPORTADOR NATIVO DO XML SB8 DO TOTVS PROTHEUS ---
+// --- PARSER E IMPORTADOR NATIVO DO XML SB8 DO TOTVS PROTHEUS (CORRIGIDO PARA SOMA) ---
 
 function tratarNumeroTotvs(valorTexto) {
     if (!valorTexto) return 0.0;
@@ -650,12 +656,23 @@ function tratarNumeroTotvs(valorTexto) {
     return parseFloat(str) || 0.0;
 }
 
-function processarArquivoTotvs() {
+async function processarArquivoTotvs() {
     const fileInput = document.getElementById('upload-xml-totvs');
     if (!fileInput || !fileInput.files.length) return alert("Selecione o arquivo XML exportado da SB8!");
 
+    const chkLimpar = document.getElementById('check-limpar-estoque');
+    if (chkLimpar && chkLimpar.checked) {
+        if (!confirm("Você selecionou para LIMPAR OS SALDOS ANTIGOS antes de importar.\n\nIsso irá zerar tudo que está disponível no momento no app. Continuar?")) {
+            return;
+        }
+    }
+
     const file = fileInput.files[0];
     const reader = new FileReader();
+    const btn = document.querySelector('button[onclick="processarArquivoTotvs()"]');
+    const txtOriginal = btn.innerText;
+    btn.innerText = "Processando XML...";
+    btn.disabled = true;
 
     reader.onload = async function(e) {
         const text = e.target.result;
@@ -669,7 +686,8 @@ function processarArquivoTotvs() {
 
             let idxProduto = -1;
             let idxLote = -1;
-            let idxSaldo = -1;
+            let idxSaldo = -1;      // Saldo genérico
+            let idxSaldo2UM = -1;   // Saldo em KG (Sdo.Lote 2UM)
 
             for (let r = 0; r < rows.length; r++) {
                 const cells = rows[r].getElementsByTagName("Cell");
@@ -686,26 +704,34 @@ function processarArquivoTotvs() {
                     colIdx++;
                 }
 
+                // Linha de Cabeçalho: Acha exatamente onde estão as colunas
                 if (idxProduto === -1 && rowData.some(v => v && v.toLowerCase().includes('produto'))) {
                     rowData.forEach((val, index) => {
                         if (!val) return;
                         const h = val.toLowerCase().trim();
                         if (h === 'produto' || h.includes('cod. produto')) idxProduto = index;
                         if (h === 'lote') idxLote = index; 
-                        if (h.includes('saldo lote') || h.includes('sdo.lote')) idxSaldo = index;
+                        if (h.includes('saldo lote')) idxSaldo = index;
+                        // Força encontrar a coluna exata de KG "Sdo.Lote 2UM"
+                        if (h.includes('sdo.lote 2um') || h === 'sdo.lote 2um') idxSaldo2UM = index;
                     });
                     continue;
                 }
 
+                // Linhas de Dados
                 if (idxProduto !== -1 && idxLote !== -1) {
-                    const codMat = rowData[idxProduto];
-                    const loteNosso = rowData[idxLote];
-                    const saldoTexto = rowData[idxSaldo] || "0";
+                    const codMat = String(rowData[idxProduto] || "").trim();
+                    const loteNosso = String(rowData[idxLote] || "").trim();
+                    
+                    // Se existe a coluna 2UM, usa ela como prioridade absoluta para pegar em KG
+                    const indexCorretoSaldo = (idxSaldo2UM !== -1) ? idxSaldo2UM : idxSaldo;
+                    const saldoTexto = rowData[indexCorretoSaldo] || "0";
 
                     if (codMat && loteNosso) {
                         const pesoDisponivel = tratarNumeroTotvs(saldoTexto);
 
                         if (pesoDisponivel > 0) {
+                            // AGRUPAMENTO DOS ARMAZÉNS
                             if (!lotesAgrupados[loteNosso]) {
                                 lotesAgrupados[loteNosso] = {
                                     codigo_barras_lote: loteNosso, 
@@ -728,9 +754,17 @@ function processarArquivoTotvs() {
             }));
 
             if (listaLotes.length === 0) {
-                return alert("Nenhum lote com saldo maior que zero foi encontrado no arquivo.");
+                alert("Nenhum lote com saldo maior que zero foi encontrado no arquivo.");
+                btn.innerText = txtOriginal; btn.disabled = false;
+                return;
             }
 
+            // Se o checkbox de limpar estiver marcado, chama a rota de limpeza
+            if (chkLimpar && chkLimpar.checked) {
+                await fetch(`${API_URL}/admin/estoque/limpar`, { method: 'POST' });
+            }
+
+            // Envia a lista agrupada
             const res = await fetch(`${API_URL}/admin/lotes/importar-massa`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -739,8 +773,9 @@ function processarArquivoTotvs() {
 
             if (res.ok) {
                 const data = await res.json();
-                alert(`Carga SB8 Concluída com Sucesso!\n\nLotes Únicos Importados (Armazéns somados): ${data.importados}\nLinhas Zeradas Ignoradas: ${ignoradosZerados}`);
+                alert(`Carga SB8 Concluída com Sucesso!\n\nLotes Únicos Importados (Armazéns somados): ${data.importados}\nLinhas Zeradas Ignoradas no XML: ${ignoradosZerados}`);
                 fileInput.value = '';
+                if (chkLimpar) chkLimpar.checked = false; // Desmarca automático para evitar limpar sem querer no 2º arquivo
                 await baixarDadosMestres();
             } else {
                 const err = await res.json();
@@ -750,6 +785,8 @@ function processarArquivoTotvs() {
         } catch (err) {
             console.error(err);
             alert("Erro ao ler o arquivo XML. Certifique-se de que é a exportação original da tabela SB8.");
+        } finally {
+            btn.innerText = txtOriginal; btn.disabled = false;
         }
     };
 
