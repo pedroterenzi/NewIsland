@@ -41,6 +41,11 @@ async function inicializarPainel() {
     
     document.getElementById('txt-user').innerText = `Operador: ${usuarioLogado.nome}`;
     
+    // Preenche os campos de operador com o nome logado para facilitar
+    document.getElementById('abs-operador').value = usuarioLogado.nome;
+    document.getElementById('dev-operador').value = usuarioLogado.nome;
+    document.getElementById('ref-operador').value = usuarioLogado.nome;
+    
     if (parseInt(usuarioLogado.nivel) >= 2) {
         document.querySelectorAll('.restrito-lider-adm').forEach(el => el.classList.remove('escondido'));
     } else {
@@ -81,7 +86,7 @@ function preencherSeletoresIniciais() {
 }
 
 function navegarPara(idAba) {
-    if (parseInt(usuarioLogado.nivel) < 2 && (idAba === 'visao' || idAba === 'admin')) {
+    if (parseInt(usuarioLogado.nivel) < 2 && (idAba === 'visao' || idAba === 'admin' || idAba === 'historico')) {
         alert("Acesso Restrito: Apenas gestores podem acessar esta tela.");
         return;
     }
@@ -96,6 +101,7 @@ function navegarPara(idAba) {
     if (nav) nav.classList.add('ativo');
 
     if (idAba === 'visao') document.getElementById('resultado-visao-op').classList.add('escondido');
+    if (idAba === 'historico') document.getElementById('resultado-historico-op').classList.add('escondido');
     if (idAba === 'admin') renderizarGestao();
 }
 
@@ -140,6 +146,7 @@ async function buscarDetalhesEtiqueta() {
 }
 
 async function confirmarAbastecimentoLote() {
+    const operador = document.getElementById('abs-operador').value.trim() || usuarioLogado.nome;
     const op = document.getElementById('abs-op').value.trim();
     const maquina = parseInt(document.getElementById('abs-maquina').value);
     const pesoApontado = parseFloat(document.getElementById('abs-peso-apontar').value);
@@ -160,13 +167,15 @@ async function confirmarAbastecimentoLote() {
                 maquina_numero: maquina,
                 codigo_barras_lote: loteConsultadoTemp.codigo_barras_lote,
                 peso_apontado: pesoApontado,
-                operador: usuarioLogado.nome
+                operador: operador
             })
         });
 
         if (res.ok) {
             alert(`Sucesso! ${pesoApontado} kg do Lote ${loteConsultadoTemp.lote_fornecedor} alocados na OP ${op}.`);
             document.getElementById('dev-op').value = op;
+            document.getElementById('busca-visao-op').value = op;
+            document.getElementById('busca-hist-op').value = op;
             document.getElementById('abs-barcode').value = '';
             document.getElementById('abs-peso-apontar').value = '';
             document.getElementById('preview-lote-box').classList.add('escondido');
@@ -298,6 +307,7 @@ function calcularPesoTransferencia() {
 }
 
 async function executarDevolucao() {
+    const operador = document.getElementById('dev-operador').value.trim() || usuarioLogado.nome;
     const consumoId = parseInt(document.getElementById('dev-consumo-id').value);
     const tipo = document.getElementById('dev-tipo-operacao').value;
 
@@ -314,7 +324,7 @@ async function executarDevolucao() {
                 body: JSON.stringify({
                     consumo_id: consumoId,
                     peso_manual_kg: pesoManual,
-                    operador: usuarioLogado.nome
+                    operador: operador
                 })
             });
 
@@ -344,7 +354,7 @@ async function executarDevolucao() {
                     consumo_id: consumoId,
                     nova_ordem_destino: novaOP,
                     peso_transferido_kg: pesoTransferido,
-                    operador: usuarioLogado.nome
+                    operador: operador
                 })
             });
 
@@ -383,6 +393,7 @@ function resetarTelaDevolucao() {
 // --- FLUXO 3: REFUGO ---
 
 async function salvarRefugo() {
+    const operador = document.getElementById('ref-operador').value.trim() || usuarioLogado.nome;
     const op = document.getElementById('ref-op').value.trim();
     const maquina = parseInt(document.getElementById('ref-maquina').value);
     const peso = parseFloat(document.getElementById('ref-peso').value);
@@ -401,7 +412,7 @@ async function salvarRefugo() {
                 maquina_numero: maquina,
                 peso_refugo_kg: peso,
                 tipo_refugo: motivo,
-                operador: usuarioLogado.nome
+                operador: operador
             })
         });
 
@@ -443,7 +454,7 @@ async function buscarDetalhesVisaoOP() {
                         </div>
                         <div class="grid-3">
                             <div class="resumo-item" style="flex-direction:column; gap:4px; margin:0;">
-                                <span style="font-size:11px;">Lote</span>
+                                <span style="font-size:11px;">Lote Fornecedor</span>
                                 <strong style="color:var(--text-color);">${m.lote_fornecedor}</strong>
                             </div>
                             <div class="resumo-item" style="flex-direction:column; gap:4px; margin:0;">
@@ -471,6 +482,78 @@ async function buscarDetalhesVisaoOP() {
     }
 }
 
+// --- HISTÓRICO DE MOVIMENTAÇÕES ---
+
+async function buscarHistoricoOP() {
+    const op = document.getElementById('busca-hist-op').value.trim();
+    if (!op) return alert("Digite o número da OP para buscar o histórico!");
+
+    const divResultado = document.getElementById('resultado-historico-op');
+    divResultado.classList.remove('escondido');
+    divResultado.innerHTML = `<p style="text-align:center; color:var(--text-muted);">Buscando histórico...</p>`;
+
+    try {
+        const res = await fetch(`${API_URL}/historico-movimentacoes/${encodeURIComponent(op)}`);
+        if (res.ok) {
+            const historico = await res.json();
+            
+            if (historico.length === 0) {
+                divResultado.innerHTML = `<p style="text-align:center; color:var(--accent-orange);">Nenhum histórico registrado para a OP ${op}.</p>`;
+                return;
+            }
+
+            let htmlCards = '';
+            historico.forEach(h => {
+                // Configura estilo da badge dependendo do tipo
+                let cssClass = 'bg-transf';
+                if (h.tipo_movimentacao.includes('ABASTECIMENTO') || h.tipo_movimentacao.includes('ENTRADA')) {
+                    cssClass = 'bg-entrada';
+                } else if (h.tipo_movimentacao.includes('DEVOLUÇÃO') || h.tipo_movimentacao.includes('REFUGO') || h.tipo_movimentacao.includes('SAÍDA')) {
+                    cssClass = 'bg-saida';
+                }
+
+                // Formatar Data
+                const dataFormatada = new Date(h.data_hora).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+
+                htmlCards += `
+                    <div class="card" style="padding: 16px; margin-bottom: 12px; background: rgba(255,255,255,0.02);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                            <span class="hist-badge ${cssClass}">${h.tipo_movimentacao}</span>
+                            <span style="font-size: 11px; color: var(--text-muted);">${dataFormatada}</span>
+                        </div>
+                        <div class="grid-2" style="gap:8px; margin-bottom: 8px;">
+                            <div style="font-size: 13px;">
+                                <span style="color:var(--text-muted);">Responsável:</span><br>
+                                <strong style="color:#fff;">${h.operador}</strong>
+                            </div>
+                            <div style="font-size: 13px;">
+                                <span style="color:var(--text-muted);">Quantidade:</span><br>
+                                <strong style="color:var(--accent-orange);">${parseFloat(h.quantidade_kg).toFixed(2)} kg</strong>
+                            </div>
+                        </div>
+                        <div style="font-size: 13px;">
+                            <span style="color:var(--text-muted);">Lote/Etiqueta:</span><br>
+                            <strong style="color:#fff;">${h.codigo_barras_lote || 'N/A'}</strong>
+                        </div>
+                        <div style="font-size: 12px; color: var(--text-muted); margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.05);">
+                            <i>${h.detalhes || ''}</i>
+                        </div>
+                    </div>
+                `;
+            });
+
+            divResultado.innerHTML = `
+                <h3 style="margin-top:20px; text-align: left;">Extrato de Movimentações</h3>
+                ${htmlCards}
+            `;
+        } else {
+            divResultado.innerHTML = `<p style="text-align:center; color:var(--danger-color);">Erro ao buscar histórico.</p>`;
+        }
+    } catch (e) { 
+        divResultado.innerHTML = `<p style="text-align:center; color:var(--danger-color);">Erro de conexão ao servidor.</p>`;
+    }
+}
+
 // --- ADMIN / CADASTROS ---
 
 function renderizarGestao() {
@@ -478,7 +561,7 @@ function renderizarGestao() {
     if (boxMat) {
         boxMat.innerHTML = MESTRE_MATERIAIS.map(m => `
             <div class="item-list">
-                <div><strong>${m.codigo_material}</strong> - ${m.descricao}</div>
+                <div><strong>${m.codigo_material}</strong><br><span style="font-size:11px; color:var(--text-muted);">${m.descricao}</span></div>
                 <button class="btn-small-delete" onclick="deletarRegistro('master_materiais', ${m.id})">X</button>
             </div>
         `).join('');
@@ -717,7 +800,6 @@ async function processarArquivoLotesExcel() {
                             }
                             lotesAgrupados[loteNosso].peso_inicial += pesoDisponivel;
                             
-                            // Garante que a descrição seja pega mesmo que a primeira linha do Excel não a tenha
                             if (descricao && !lotesAgrupados[loteNosso].descricao_material) {
                                 lotesAgrupados[loteNosso].descricao_material = descricao;
                             }
@@ -755,6 +837,7 @@ async function processarArquivoLotesExcel() {
                 fileInput.value = '';
                 if (chkLimpar) chkLimpar.checked = false; 
                 await baixarDadosMestres();
+                renderizarGestao(); // Atualiza a aba de materiais após importar
             } else {
                 const err = await res.json();
                 alert(`Erro ao importar lotes: ${err.detail}`);
