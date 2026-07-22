@@ -430,3 +430,108 @@ async function deletarRegistro(tabela, id) {
     await baixarDadosMestres();
     renderizarGestao();
 }
+
+// --- PARSER E IMPORTADOR NATIVO DO XML SB8 DO TOTVS PROTHEUS ---
+function processarArquivoTotvs() {
+    const fileInput = document.getElementById('upload-xml-totvs');
+    if (!fileInput || !fileInput.files.length) return alert("Selecione o arquivo XML exportado da SB8!");
+
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+
+    reader.onload = async function(e) {
+        const text = e.target.result;
+        const listaLotes = [];
+        let ignoradosZerados = 0;
+
+        try {
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(text, "text/xml");
+            const rows = xmlDoc.getElementsByTagName("Row");
+
+            let idxProduto = -1;
+            let idxLote = -1;
+            let idxSaldo = -1;
+
+            for (let r = 0; r < rows.length; r++) {
+                const cells = rows[r].getElementsByTagName("Cell");
+                let rowData = [];
+                let colIdx = 0;
+
+                // Mapeia células do XML respeitando o atributo de índice ss:Index
+                for (let c = 0; c < cells.length; c++) {
+                    const cellIndexAttr = cells[c].getAttribute("ss:Index");
+                    if (cellIndexAttr) {
+                        colIdx = parseInt(cellIndexAttr) - 1;
+                    }
+                    const dataTag = cells[c].getElementsByTagName("Data")[0];
+                    rowData[colIdx] = dataTag ? dataTag.textContent.trim() : "";
+                    colIdx++;
+                }
+
+                // Identifica a linha de cabeçalho
+                if (idxProduto === -1 && rowData.some(v => v && v.toLowerCase().includes('produto'))) {
+                    rowData.forEach((val, index) => {
+                        if (!val) return;
+                        const h = val.toLowerCase().trim();
+                        if (h === 'produto' || h.includes('cod. produto')) idxProduto = index;
+                        if (h === 'lote') idxLote = index; // Pega estritamente a coluna Lote (nosso lote)
+                        if (h.includes('saldo lote') || h.includes('sdo.lote')) idxSaldo = index;
+                    });
+                    continue;
+                }
+
+                // Mapeia os dados das bobinas/lotes
+                if (idxProduto !== -1 && idxLote !== -1) {
+                    const codMat = rowData[idxProduto];
+                    const loteNosso = rowData[idxLote];
+                    let saldoTexto = rowData[idxSaldo] || "0";
+
+                    if (codMat && loteNosso) {
+                        saldoTexto = saldoTexto.replace(/\./g, '').replace(',', '.');
+                        const pesoDisponivel = parseFloat(saldoTexto) || 0.0;
+
+                        // Importa apenas lotes que possuem saldo físico maior que ZERO
+                        if (pesoDisponivel > 0) {
+                            listaLotes.push({
+                                codigo_barras_lote: loteNosso, // Nosso Lote é a chave/barcode
+                                codigo_material: codMat,
+                                lote_fornecedor: loteNosso,
+                                peso_inicial: pesoDisponivel
+                            });
+                        } else {
+                            ignoradosZerados++;
+                        }
+                    }
+                }
+            }
+
+            if (listaLotes.length === 0) {
+                return alert("Nenhum lote com saldo maior que zero foi encontrado no arquivo.");
+            }
+
+            // Envia em massa para o banco de dados
+            const res = await fetch(`${API_URL}/admin/lotes/importar-massa`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(listaLotes)
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                alert(`Carga SB8 Concluída com Sucesso!\n\nLotes Ativos Importados: ${data.importados}\nLotes Zerados Ignorados: ${ignoradosZerados}`);
+                fileInput.value = '';
+                await baixarDadosMestres();
+            } else {
+                const err = await res.json();
+                alert(`Erro ao importar lotes: ${err.detail}`);
+            }
+
+        } catch (err) {
+            console.error(err);
+            alert("Erro ao ler o arquivo XML. Certifique-se de que é a exportação original da tabela SB8.");
+        }
+    };
+
+    reader.readAsText(file, "UTF-8");
+}
