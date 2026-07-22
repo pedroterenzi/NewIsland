@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Unicharm MP - Rastreabilidade</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Adicionada a biblioteca SheetJS para ler o Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root {
             --bg-color: #0b1329;
@@ -256,6 +258,16 @@
     <div id="tela-admin" class="escondido aba-conteudo">
         <h2 style="text-align: left; margin-bottom: 24px;">Gestão de Cadastros</h2>
         
+        <!-- IMPORTADOR DA PLANILHA EXCEL DE PARÂMETROS -->
+        <div class="card">
+            <h3>📗 Importar Planilha de Parâmetros (Excel)</h3>
+            <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">Faça o upload do arquivo <b>parametros materiais.xlsx</b> para atualizar os fatores de conversão (cm para kg) de todos os materiais de uma só vez.</p>
+            <div class="form-group">
+                <input type="file" id="upload-excel-param" accept=".xlsx,.xls" style="padding:10px;">
+            </div>
+            <button class="btn-blue" onclick="processarPlanilhaParametros()" style="background: var(--success-color); box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);">Processar Fatores (Excel)</button>
+        </div>
+
         <!-- IMPORTADOR AUTOMÁTICO DO XML SB8 DO TOTVS -->
         <div class="card">
             <h3>📥 Importar XML SB8 (TOTVS Protheus)</h3>
