@@ -250,8 +250,8 @@ async function executarDevolucao() {
 
     if (tipo === 'fisica') {
         const pesoManual = parseFloat(document.getElementById('dev-peso-manual').value);
-        if (isNaN(pesoManual) || pesoManual < 0) {
-            return alert("Informe as medidas corretamente para calcular o peso!");
+        if (isNaN(pesoManual) || pesoManual <= 0) {
+            return alert("Verifique as medidas digitadas ou verifique se esse material tem um Fator de Conversão cadastrado!");
         }
 
         try {
@@ -462,6 +462,85 @@ async function deletarRegistro(tabela, id) {
     await fetch(`${API_URL}/admin/${tabela}/${id}`, { method: 'DELETE' });
     await baixarDadosMestres();
     renderizarGestao();
+}
+
+// --- IMPORTADOR DA PLANILHA DE PARÂMETROS EXCEL (NOVO) ---
+function processarPlanilhaParametros() {
+    const fileInput = document.getElementById('upload-excel-param');
+    if (!fileInput || !fileInput.files.length) return alert("Selecione o arquivo Excel de parâmetros!");
+
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+    const btn = document.querySelector('button[onclick="processarPlanilhaParametros()"]');
+    const txtOriginal = btn.innerText;
+    btn.innerText = "Processando Excel...";
+    btn.disabled = true;
+
+    reader.onload = function(e) {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, {type: 'array'});
+            
+            // Pega a primeira aba
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            
+            // Converte para JSON
+            const json = XLSX.utils.sheet_to_json(worksheet);
+            const payload = [];
+
+            json.forEach(row => {
+                const cod = String(row['Código'] || '').trim();
+                const desc = String(row['Descrição'] || '').trim();
+                const peso = parseFloat(row['Peso (kg)']) || 0.0;
+                const fator = parseFloat(row['Variável Raio']) || 0.0;
+
+                // Ignora a primeira linha suja que tem "0" ou está em branco
+                if (cod && cod !== '0' && cod.toLowerCase() !== 'nan') {
+                    payload.push({
+                        codigo_material: cod,
+                        descricao: desc || `Material ${cod}`,
+                        peso_unitario_kg: peso,
+                        fator_conversao: fator
+                    });
+                }
+            });
+
+            if (payload.length === 0) {
+                alert("Nenhum material válido encontrado na planilha.");
+                btn.innerText = txtOriginal; btn.disabled = false;
+                return;
+            }
+
+            // Envia o JSON mastigado para a API salvar no banco
+            fetch(`${API_URL}/admin/materiais/importar-massa`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            })
+            .then(res => {
+                if(res.ok) return res.json();
+                throw new Error("Erro na importação");
+            })
+            .then(data => {
+                alert(`Sucesso!\n${data.importados} materiais atualizados com Fatores de Conversão e Pesos Unitários.`);
+                fileInput.value = '';
+                btn.innerText = txtOriginal; btn.disabled = false;
+                baixarDadosMestres(); 
+            })
+            .catch(err => {
+                alert("Erro ao enviar dados para o servidor.");
+                btn.innerText = txtOriginal; btn.disabled = false;
+            });
+
+        } catch (err) {
+            console.error(err);
+            alert("Erro ao ler o arquivo Excel. Verifique se o formato está correto.");
+            btn.innerText = txtOriginal; btn.disabled = false;
+        }
+    };
+
+    reader.readAsArrayBuffer(file);
 }
 
 // --- FUNÇÃO AUXILIAR DE TRATAMENTO DE NÚMEROS DO TOTVS ---
