@@ -431,6 +431,22 @@ async function deletarRegistro(tabela, id) {
     renderizarGestao();
 }
 
+// --- FUNÇÃO AUXILIAR DE TRATAMENTO DE NÚMEROS DO TOTVS ---
+function tratarNumeroTotvs(valorTexto) {
+    if (!valorTexto) return 0.0;
+    let str = String(valorTexto).trim();
+    
+    // Se contiver vírgula e ponto (ex: "1.151,00") -> remove ponto de milhar e troca vírgula por ponto
+    if (str.includes(',') && str.includes('.')) {
+        str = str.replace(/\./g, '').replace(',', '.');
+    } else if (str.includes(',')) {
+        // Se só contiver vírgula (ex: "1151,00")
+        str = str.replace(',', '.');
+    }
+    // Se contiver apenas ponto (ex: XML nativo "2779.8"), MANTÉM o ponto!
+    return parseFloat(str) || 0.0;
+}
+
 // --- PARSER E IMPORTADOR NATIVO DO XML SB8 DO TOTVS PROTHEUS ---
 function processarArquivoTotvs() {
     const fileInput = document.getElementById('upload-xml-totvs');
@@ -485,11 +501,11 @@ function processarArquivoTotvs() {
                 if (idxProduto !== -1 && idxLote !== -1) {
                     const codMat = rowData[idxProduto];
                     const loteNosso = rowData[idxLote];
-                    let saldoTexto = rowData[idxSaldo] || "0";
+                    const saldoTexto = rowData[idxSaldo] || "0";
 
                     if (codMat && loteNosso) {
-                        saldoTexto = saldoTexto.replace(/\./g, '').replace(',', '.');
-                        const pesoDisponivel = parseFloat(saldoTexto) || 0.0;
+                        // Converte utilizando o tratamento correto de número float
+                        const pesoDisponivel = tratarNumeroTotvs(saldoTexto);
 
                         // Importa apenas lotes que possuem saldo físico maior que ZERO
                         if (pesoDisponivel > 0) {
