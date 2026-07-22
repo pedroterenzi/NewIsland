@@ -60,37 +60,33 @@
         
         .nav-inferior { 
             position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); 
-            width: calc(100% - 32px); max-width: 550px; 
-            background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(16px);
+            width: calc(100% - 20px); max-width: 600px; 
+            background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(16px);
             border: 1px solid rgba(255,255,255,0.08); 
             display: flex; justify-content: space-between; align-items: center; 
-            padding: 8px 12px; border-radius: 100px; 
+            padding: 8px 10px; border-radius: 100px; 
             z-index: 1000; box-shadow: 0 10px 40px rgba(0,0,0,0.6); 
         }
         .nav-item { 
             background: transparent; border: none; color: #64748b; 
             display: flex; flex-direction: column; align-items: center; gap: 4px; 
-            cursor: pointer; padding: 8px 12px; border-radius: 20px; 
-            font-weight: 600; font-size: 11px; transition: all 0.3s ease;
+            cursor: pointer; padding: 8px 10px; border-radius: 20px; 
+            font-weight: 600; font-size: 10px; transition: all 0.3s ease;
         }
-        .nav-item .icon { font-size: 20px; margin-bottom: 2px; transition: transform 0.2s ease;}
+        .nav-item .icon { font-size: 18px; margin-bottom: 2px; transition: transform 0.2s ease;}
         .nav-item.ativo { color: var(--accent-orange); background: rgba(249, 115, 22, 0.1); }
         .nav-item.ativo .icon { transform: scale(1.1); }
         .nav-item.sair { color: #ef4444; }
         
         .escondido { display: none !important; }
         
-        .table-wrapper { width: 100%; overflow-x: auto; border-radius: 14px; border: 1px solid var(--border-color); background: #0f172a; }
-        .table-premium { width: 100%; border-collapse: separate; border-spacing: 0; text-align: left; font-size: 13px; white-space: nowrap; }
-        .table-premium th { background: #111827; color: var(--accent-orange); padding: 16px; font-weight: 700; border-bottom: 2px solid #1e293b; text-transform: uppercase; }
-        .table-premium td { padding: 16px; border-bottom: 1px solid #1e293b; color: var(--text-color); }
-        
-        .badge-success { background: rgba(16, 185, 129, 0.1); color: var(--success-color); padding: 6px 10px; border-radius: 8px; font-weight: 700; font-size: 11px;}
-        .badge-danger { background: rgba(239, 68, 68, 0.1); color: var(--danger-color); padding: 6px 10px; border-radius: 8px; font-weight: 700; font-size: 11px;}
-        .badge-blue { background: rgba(59, 130, 246, 0.1); color: var(--accent-blue); padding: 6px 10px; border-radius: 8px; font-weight: 700; font-size: 11px;}
-        
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); display: flex; justify-content: center; align-items: center; z-index: 2000; padding: 20px; }
         .modal-content { background: linear-gradient(145deg, #111827 0%, #0f172a 100%); border: 1px solid #1e293b; border-radius: 24px; padding: 32px; width: 100%; max-width: 440px; }
+
+        .hist-badge { display: inline-block; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+        .bg-entrada { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
+        .bg-saida { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
+        .bg-transf { background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3); }
 
         @media (max-width: 500px) {
             .grid-2 { grid-template-columns: 1fr; gap: 12px; }
@@ -121,7 +117,11 @@
         </div>
 
         <div class="card">
-            <h3>1. Dados da Linha</h3>
+            <h3>1. Dados da Linha e Responsável</h3>
+            <div class="form-group">
+                <label>Operador Responsável (Edite se necessário):</label>
+                <input type="text" id="abs-operador" placeholder="Nome ou Matrícula">
+            </div>
             <div class="grid-2">
                 <div class="form-group">
                     <label>Ordem de Produção (OP):</label>
@@ -184,6 +184,12 @@
         <!-- PAINEL DA DEVOLUÇÃO SE CARREGADO -->
         <div id="painel-devolucao" class="card escondido">
             <input type="hidden" id="dev-consumo-id">
+            
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label>Operador Responsável (Edite se necessário):</label>
+                <input type="text" id="dev-operador" placeholder="Nome ou Matrícula">
+            </div>
+
             <h4 style="color:var(--accent-blue); margin-bottom:12px;">MP Localizada na Linha</h4>
             <div class="resumo-box" style="padding: 12px; margin-bottom: 15px;">
                 <div class="resumo-item"><span>OP Atual:</span> <strong id="dev-info-op">---</strong></div>
@@ -268,6 +274,10 @@
         <h2 style="text-align: left; margin-bottom: 20px;">Apontamento de Refugo</h2>
         <div class="card">
             <h3>Registrar Peso Refugado</h3>
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label>Operador Responsável (Edite se necessário):</label>
+                <input type="text" id="ref-operador" placeholder="Nome ou Matrícula">
+            </div>
             <div class="form-group"><label>OP:</label><input type="text" id="ref-op" placeholder="Nº da Ordem"></div>
             <div class="form-group"><label>Máquina:</label><select id="ref-maquina"></select></div>
             <div class="form-group"><label>Peso Refugado (kg):</label><input type="number" id="ref-peso" step="0.1"></div>
@@ -298,11 +308,28 @@
             </div>
         </div>
 
-        <!-- Onde os cards de resumo da OP aparecerão -->
         <div id="resultado-visao-op" class="escondido"></div>
     </div>
 
-    <!-- ABA 5: GESTÃO / ADMIN -->
+    <!-- ABA 5: HISTÓRICO DE MOVIMENTAÇÕES -->
+    <div id="tela-historico" class="escondido aba-conteudo">
+        <h2 style="text-align: left; margin-bottom: 8px;">Histórico de Movimentações</h2>
+        <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 24px;">Visualize todas as ações realizadas vinculadas a uma OP.</p>
+
+        <div class="card">
+            <div class="form-group">
+                <label>Número da Ordem de Produção (OP):</label>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="busca-hist-op" placeholder="Ex: OP-2026-001" style="flex: 1;">
+                    <button class="btn-orange" style="width: auto; padding: 0 20px;" onclick="buscarHistoricoOP()">Buscar Histórico</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="resultado-historico-op" class="escondido"></div>
+    </div>
+
+    <!-- ABA 6: GESTÃO / ADMIN -->
     <div id="tela-admin" class="escondido aba-conteudo">
         <h2 style="text-align: left; margin-bottom: 24px;">Gestão de Cadastros</h2>
         
@@ -350,12 +377,13 @@
         </div>
     </div>
 
-    <!-- MENU INFERIOR -->
+    <!-- MENU INFERIOR (ATUALIZADO) -->
     <nav class="nav-inferior escondido" id="menu-navegacao">
         <button class="nav-item ativo" id="nav-abastecer" onclick="navegarPara('abastecer')"><div class="icon">🔗</div>Setar MP</button>
         <button class="nav-item" id="nav-devolver" onclick="navegarPara('devolver')"><div class="icon">⚖️</div>Devolver</button>
         <button class="nav-item" id="nav-refugo" onclick="navegarPara('refugo')"><div class="icon">🗑️</div>Refugo</button>
         <button class="nav-item restrito-lider-adm escondido" id="nav-visao" onclick="navegarPara('visao')"><div class="icon">📊</div>Visão OP</button>
+        <button class="nav-item restrito-lider-adm escondido" id="nav-historico" onclick="navegarPara('historico')"><div class="icon">📜</div>Movimentos</button>
         <button class="nav-item restrito-lider-adm escondido" id="nav-admin" onclick="navegarPara('admin')"><div class="icon">⚙️</div>Gestão</button>
         <button class="nav-item sair" onclick="sair()"><div class="icon">🚪</div>Sair</button>
     </nav>
