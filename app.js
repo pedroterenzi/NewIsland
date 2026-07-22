@@ -109,7 +109,7 @@ function fecharModal(id) {
     if (modal) modal.classList.add('escondido'); 
 }
 
-// --- FLUXO 1: ABASTECER (CONSULTAR -> CONFIRMAR) ---
+// --- FLUXO 1: ABASTECER ---
 
 async function buscarDetalhesEtiqueta() {
     const barcode = document.getElementById('abs-barcode').value.trim();
@@ -147,7 +147,6 @@ async function confirmarAbastecimentoLote() {
     if (!op) return alert("Digite a Ordem de Produção (OP) antes de confirmar!");
     if (!loteConsultadoTemp) return alert("Bipa a etiqueta de matéria-prima primeiro!");
     if (isNaN(pesoApontado) || pesoApontado <= 0) return alert("Digite um peso válido para apontar!");
-    
     if (pesoApontado > parseFloat(loteConsultadoTemp.peso_atual)) {
         return alert(`Você não pode apontar ${pesoApontado}kg pois o lote tem apenas ${loteConsultadoTemp.peso_atual}kg disponíveis!`);
     }
@@ -633,7 +632,7 @@ function processarPlanilhaParametros() {
 }
 
 
-// --- PARSER E IMPORTADOR NATIVO DE SALDOS POR LOTE (EXCEL TOTVS) ---
+// --- PARSER E IMPORTADOR NATIVO DE SALDOS POR LOTE (EXCEL MTR425) ---
 
 function tratarNumeroTotvs(valorTexto) {
     if (!valorTexto && valorTexto !== 0) return 0.0;
@@ -672,9 +671,9 @@ async function processarArquivoLotesExcel() {
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, {type: 'array'});
             
-            let targetSheetName = workbook.SheetNames.find(s => s.toLowerCase().includes('saldo')) || workbook.SheetNames[workbook.SheetNames.length > 1 ? 1 : 0];
-            
+            let targetSheetName = workbook.SheetNames.length > 1 ? workbook.SheetNames[1] : workbook.SheetNames[0];
             const worksheet = workbook.Sheets[targetSheetName];
+            
             const json = XLSX.utils.sheet_to_json(worksheet, {header: 1, defval: ""});
 
             let idxProduto = -1;
@@ -694,14 +693,14 @@ async function processarArquivoLotesExcel() {
                         idxLote = rowLower.findIndex(v => (v === 'lote' || v.includes('lote')) && !v.includes('sub'));
                         idxSaldo = rowLower.findIndex(v => v.includes('saldo'));
                     }
-                    continue;
+                    continue; 
                 }
 
                 if (idxProduto !== -1 && idxLote !== -1 && idxSaldo !== -1) {
                     const codMat = String(row[idxProduto]).trim();
                     const loteNosso = String(row[idxLote]).trim();
                     const saldoTexto = row[idxSaldo];
-                    const descricao = idxDescricao !== -1 ? String(row[idxDescricao]).trim() : "";
+                    const descricao = idxDescricao !== -1 && row[idxDescricao] ? String(row[idxDescricao]).trim() : "";
 
                     if (codMat && loteNosso && codMat.toLowerCase() !== 'produto') {
                         const pesoDisponivel = tratarNumeroTotvs(saldoTexto);
@@ -717,6 +716,11 @@ async function processarArquivoLotesExcel() {
                                 };
                             }
                             lotesAgrupados[loteNosso].peso_inicial += pesoDisponivel;
+                            
+                            // Garante que a descrição seja pega mesmo que a primeira linha do Excel não a tenha
+                            if (descricao && !lotesAgrupados[loteNosso].descricao_material) {
+                                lotesAgrupados[loteNosso].descricao_material = descricao;
+                            }
                         } else {
                             ignoradosZerados++;
                         }
