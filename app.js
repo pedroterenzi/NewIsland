@@ -3,7 +3,7 @@ const API_URL = "https://newisland-zzhk.onrender.com";
 let usuarioLogado = null;
 let MESTRE_MATERIAIS = [], MESTRE_MAQUINAS = [];
 let loteConsultadoTemp = null;
-let consumoAtivoDevolucao = null; // Variável para segurar os dados na devolução
+let consumoAtivoDevolucao = null; 
 
 async function executarLogin() {
     const login = document.getElementById('login-usuario').value.trim();
@@ -95,7 +95,7 @@ function navegarPara(idAba) {
     if (tela) tela.classList.remove('escondido');
     if (nav) nav.classList.add('ativo');
 
-    if (idAba === 'visao') carregarVisaoOP();
+    if (idAba === 'visao') document.getElementById('resultado-visao-op').classList.add('escondido');
     if (idAba === 'admin') renderizarGestao();
 }
 
@@ -109,7 +109,7 @@ function fecharModal(id) {
     if (modal) modal.classList.add('escondido'); 
 }
 
-// --- FLUXO 1: ABASTECER (CONSULTAR -> CONFIRMAR) ---
+// --- FLUXO 1: ABASTECER (SETAR MP LIVRE) ---
 
 async function buscarDetalhesEtiqueta() {
     const barcode = document.getElementById('abs-barcode').value.trim();
@@ -124,6 +124,9 @@ async function buscarDetalhesEtiqueta() {
             document.getElementById('prev-desc').innerText = loteConsultadoTemp.descricao;
             document.getElementById('prev-lote').innerText = loteConsultadoTemp.lote_fornecedor;
             document.getElementById('prev-peso').innerText = `${loteConsultadoTemp.peso_atual} kg`;
+            
+            // Sugere apontar o peso inteiro disponível do lote/palete
+            document.getElementById('abs-peso-apontar').value = loteConsultadoTemp.peso_atual;
             
             document.getElementById('preview-lote-box').classList.remove('escondido');
         } else {
@@ -140,12 +143,16 @@ async function buscarDetalhesEtiqueta() {
 async function confirmarAbastecimentoLote() {
     const op = document.getElementById('abs-op').value.trim();
     const maquina = parseInt(document.getElementById('abs-maquina').value);
+    const pesoApontado = parseFloat(document.getElementById('abs-peso-apontar').value);
 
-    if (!op) {
-        return alert("Digite a Ordem de Produção (OP) antes de confirmar!");
+    if (!op) return alert("Digite a Ordem de Produção (OP) antes de confirmar!");
+    if (!loteConsultadoTemp) return alert("Bipa a etiqueta de matéria-prima primeiro!");
+    
+    if (isNaN(pesoApontado) || pesoApontado <= 0) {
+        return alert("Digite uma quantidade válida para apontar!");
     }
-    if (!loteConsultadoTemp) {
-        return alert("Bipa a etiqueta de matéria-prima primeiro!");
+    if (pesoApontado > loteConsultadoTemp.peso_atual) {
+        return alert(`A quantidade apontada (${pesoApontado} kg) não pode ser maior que o peso disponível no lote (${loteConsultadoTemp.peso_atual} kg)!`);
     }
 
     try {
@@ -156,13 +163,15 @@ async function confirmarAbastecimentoLote() {
                 ordem_producao: op,
                 maquina_numero: maquina,
                 codigo_barras_lote: loteConsultadoTemp.codigo_barras_lote,
+                peso_apontado: pesoApontado,
                 operador: usuarioLogado.nome
             })
         });
 
         if (res.ok) {
-            alert(`Sucesso! Lote ${loteConsultadoTemp.lote_fornecedor} alocado na OP ${op}.`);
+            alert(`Sucesso! ${pesoApontado}kg do Lote ${loteConsultadoTemp.lote_fornecedor} alocados na OP ${op}.`);
             document.getElementById('abs-barcode').value = '';
+            document.getElementById('abs-peso-apontar').value = '';
             document.getElementById('preview-lote-box').classList.add('escondido');
             loteConsultadoTemp = null;
         } else {
@@ -174,7 +183,7 @@ async function confirmarAbastecimentoLote() {
     }
 }
 
-// --- FLUXO 2: DEVOLUÇÃO / TRANSFERÊNCIA ---
+// --- FLUXO 2: DEVOLUÇÃO / TRANSFERÊNCIA INTELIGENTE ---
 
 async function buscarLoteAtivoDevolucao() {
     const barcode = document.getElementById('dev-barcode').value.trim();
@@ -206,52 +215,64 @@ async function buscarLoteAtivoDevolucao() {
 
 function alternarCamposDevolucao() {
     const tipo = document.getElementById('dev-tipo-operacao').value;
-    const boxFisica = document.getElementById('box-dev-fisica');
-    const boxSistemica = document.getElementById('box-dev-sistemica');
+    
+    document.getElementById('box-dev-fisica-parcial').classList.add('escondido');
+    document.getElementById('box-dev-fisica-inteira').classList.add('escondido');
+    document.getElementById('box-dev-fisica-etiqueta').classList.add('escondido');
+    document.getElementById('box-dev-sistemica').classList.add('escondido');
+    document.getElementById('box-resultado-fisico').classList.add('escondido');
 
-    if (tipo === 'fisica') {
-        boxFisica.classList.remove('escondido');
-        boxSistemica.classList.add('escondido');
+    if (tipo === 'sistemica') {
+        document.getElementById('box-dev-sistemica').classList.remove('escondido');
     } else {
-        boxFisica.classList.add('escondido');
-        boxSistemica.classList.remove('escondido');
+        document.getElementById('box-resultado-fisico').classList.remove('escondido');
+        if (tipo === 'fisica_parcial') document.getElementById('box-dev-fisica-parcial').classList.remove('escondido');
+        if (tipo === 'fisica_inteira') document.getElementById('box-dev-fisica-inteira').classList.remove('escondido');
+        if (tipo === 'fisica_etiqueta') document.getElementById('box-dev-fisica-etiqueta').classList.remove('escondido');
     }
+    
+    calcularPesoDevolucao();
 }
 
 function calcularPesoDevolucao() {
     if (!consumoAtivoDevolucao) return;
+    const tipo = document.getElementById('dev-tipo-operacao').value;
+    let pesoEstimado = 0;
 
-    const diamExtCm = parseFloat(document.getElementById('dev-diam-ext').value) || 0;
-    const diamTubCm = parseFloat(document.getElementById('dev-diam-tub').value) || 0;
-    const fatorConversao = parseFloat(consumoAtivoDevolucao.fator_conversao) || 0;
-
-    if (diamExtCm > 0 && diamTubCm > 0 && fatorConversao > 0) {
-        // Encontra o Raio dividindo o Diâmetro por 2
-        const raioExt = diamExtCm / 2;
-        const raioTub = diamTubCm / 2;
-        
-        // Aplicação exata da fórmula matemática
-        const areaCoroa = (Math.pow(raioExt, 2) - Math.pow(raioTub, 2)) * 3.1416;
-        let pesoEstimado = areaCoroa * fatorConversao;
-        
-        if (pesoEstimado < 0) pesoEstimado = 0;
-
-        document.getElementById('dev-peso-calculado').innerText = pesoEstimado.toFixed(2) + ' kg';
-        document.getElementById('dev-peso-manual').value = pesoEstimado.toFixed(2);
-    } else {
-        document.getElementById('dev-peso-calculado').innerText = '0.00 kg';
-        document.getElementById('dev-peso-manual').value = '';
+    if (tipo === 'fisica_parcial') {
+        const diamExtCm = parseFloat(document.getElementById('dev-diam-ext').value) || 0;
+        const diamTubCm = parseFloat(document.getElementById('dev-diam-tub').value) || 0;
+        const fatorConversao = parseFloat(consumoAtivoDevolucao.fator_conversao) || 0;
+        if (diamExtCm > 0 && diamTubCm > 0 && fatorConversao > 0) {
+            const raioExt = diamExtCm / 2;
+            const raioTub = diamTubCm / 2;
+            const areaCoroa = (Math.pow(raioExt, 2) - Math.pow(raioTub, 2)) * 3.1416;
+            pesoEstimado = areaCoroa * fatorConversao;
+        }
+    } 
+    else if (tipo === 'fisica_inteira') {
+        const qtd = parseInt(document.getElementById('dev-qtd-inteiras').value) || 0;
+        const pesoUnitario = parseFloat(consumoAtivoDevolucao.peso_unitario_kg) || 0;
+        pesoEstimado = qtd * pesoUnitario;
     }
+    else if (tipo === 'fisica_etiqueta') {
+        pesoEstimado = parseFloat(document.getElementById('dev-peso-etiqueta').value) || 0;
+    }
+
+    if (pesoEstimado < 0) pesoEstimado = 0;
+    
+    document.getElementById('dev-peso-calculado').innerText = pesoEstimado.toFixed(2) + ' kg';
+    document.getElementById('dev-peso-manual').value = pesoEstimado.toFixed(2);
 }
 
 async function executarDevolucao() {
     const consumoId = parseInt(document.getElementById('dev-consumo-id').value);
     const tipo = document.getElementById('dev-tipo-operacao').value;
 
-    if (tipo === 'fisica') {
+    if (tipo !== 'sistemica') {
         const pesoManual = parseFloat(document.getElementById('dev-peso-manual').value);
         if (isNaN(pesoManual) || pesoManual <= 0) {
-            return alert("Verifique as medidas digitadas ou verifique se esse material tem um Fator de Conversão cadastrado!");
+            return alert("Verifique as medidas/quantidades informadas para calcular o peso válido!");
         }
 
         try {
@@ -312,6 +333,8 @@ function resetarTelaDevolucao() {
     document.getElementById('dev-barcode').value = '';
     document.getElementById('dev-diam-ext').value = '';
     document.getElementById('dev-diam-tub').value = '9.45';
+    document.getElementById('dev-qtd-inteiras').value = '';
+    document.getElementById('dev-peso-etiqueta').value = '';
     document.getElementById('dev-peso-calculado').innerText = '0.00 kg';
     document.getElementById('dev-peso-manual').value = '';
     document.getElementById('dev-nova-op').value = '';
@@ -321,70 +344,91 @@ function resetarTelaDevolucao() {
 }
 
 // --- FLUXO 3: REFUGO ---
-
 async function salvarRefugo() {
     const op = document.getElementById('ref-op').value.trim();
     const maquina = parseInt(document.getElementById('ref-maquina').value);
     const peso = parseFloat(document.getElementById('ref-peso').value);
     const motivo = document.getElementById('ref-motivo').value;
 
-    if (!op || isNaN(peso) || peso <= 0) {
-        return alert("Preencha todos os campos do refugo corretamente!");
-    }
+    if (!op || isNaN(peso) || peso <= 0) return alert("Preencha todos os campos do refugo corretamente!");
 
     try {
         const res = await fetch(`${API_URL}/refugo/apontar`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                ordem_producao: op,
-                maquina_numero: maquina,
-                peso_refugo_kg: peso,
-                tipo_refugo: motivo,
-                operador: usuarioLogado.nome
-            })
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ ordem_producao: op, maquina_numero: maquina, peso_refugo_kg: peso, tipo_refugo: motivo, operador: usuarioLogado.nome })
         });
+        if (res.ok) { alert("Refugo apontado com sucesso!"); document.getElementById('ref-peso').value = ''; }
+    } catch (e) { alert("Erro ao registrar refugo."); }
+}
 
+// --- NOVA VISÃO OP DETALHADA ---
+async function buscarDetalhesVisaoOP() {
+    const op = document.getElementById('busca-visao-op').value.trim();
+    if (!op) return alert("Digite o número da OP para buscar!");
+
+    const divResultado = document.getElementById('resultado-visao-op');
+    divResultado.classList.remove('escondido');
+    divResultado.innerHTML = `<p style="text-align:center; color:var(--text-muted);">Buscando materiais consumidos...</p>`;
+
+    try {
+        const res = await fetch(`${API_URL}/visao-ordens/${encodeURIComponent(op)}`);
         if (res.ok) {
-            alert("Refugo apontado com sucesso!");
-            document.getElementById('ref-peso').value = '';
+            const materiais = await res.json();
+            
+            if (materiais.length === 0) {
+                divResultado.innerHTML = `<p style="text-align:center; color:var(--accent-orange);">Nenhum apontamento encontrado para a OP ${op}.</p>`;
+                return;
+            }
+
+            let htmlCards = '';
+            materiais.forEach(m => {
+                let statusBadge = m.status === 'em_uso' ? '<span class="badge-blue">Em Uso na Máquina</span>' 
+                                : m.status === 'devolvido_estoque' ? '<span class="badge-success">Finalizado / Devolvido</span>'
+                                : '<span class="badge-danger">Transferido Sist.</span>';
+
+                htmlCards += `
+                    <div class="card" style="padding: 18px; margin-bottom: 12px; border-left: 4px solid var(--accent-blue);">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
+                            <strong style="color:var(--text-color); font-size:15px;">${m.codigo_material} - ${m.descricao}</strong>
+                            ${statusBadge}
+                        </div>
+                        <div class="grid-3">
+                            <div class="resumo-item" style="flex-direction:column; gap:4px; margin:0;">
+                                <span style="font-size:11px;">Lote</span>
+                                <strong style="color:var(--text-color);">${m.lote_fornecedor}</strong>
+                            </div>
+                            <div class="resumo-item" style="flex-direction:column; gap:4px; margin:0;">
+                                <span style="font-size:11px;">Alocado (Apontado)</span>
+                                <strong style="color:var(--accent-orange);">${parseFloat(m.peso_alocado).toFixed(1)} kg</strong>
+                            </div>
+                            <div class="resumo-item" style="flex-direction:column; gap:4px; margin:0;">
+                                <span style="font-size:11px;">Consumo Real Líquido</span>
+                                <strong style="color:var(--success-color); font-size: 16px;">${parseFloat(m.consumo_real).toFixed(1)} kg</strong>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            divResultado.innerHTML = `
+                <h3 style="margin-top:20px;">Lotes e Materiais Bipados na OP ${op}</h3>
+                ${htmlCards}
+            `;
+        } else {
+            divResultado.innerHTML = `<p style="text-align:center; color:var(--danger-color);">Erro ao buscar detalhes da OP.</p>`;
         }
-    } catch (e) {
-        alert("Erro ao registrar refugo.");
+    } catch (e) { 
+        divResultado.innerHTML = `<p style="text-align:center; color:var(--danger-color);">Erro de conexão ao servidor.</p>`;
     }
 }
 
-// --- VISÃO CONSOLIDADA ---
-
-async function carregarVisaoOP() {
-    try {
-        const res = await fetch(`${API_URL}/visao-ordens`);
-        if (res.ok) {
-            const ordens = await res.json();
-            const tbody = document.querySelector('#tabela-visao-op tbody');
-            if (!tbody) return;
-
-            tbody.innerHTML = ordens.map(o => `
-                <tr>
-                    <td><strong>${o.ordem_producao}</strong></td>
-                    <td><span class="badge-blue">Máq ${o.maquina}</span></td>
-                    <td><strong>${o.total_lotes_bipados}</strong> Lote(s)</td>
-                    <td><span class="badge-success">${parseFloat(o.consumo_real_total_kg).toFixed(1)} kg</span></td>
-                    <td><span class="badge-danger">${parseFloat(o.total_refugo_kg).toFixed(1)} kg</span></td>
-                </tr>
-            `).join('');
-        }
-    } catch (e) { console.error(e); }
-}
-
 // --- ADMIN / CADASTROS ---
-
 function renderizarGestao() {
     const boxMat = document.getElementById('lista-admin-materiais');
     if (boxMat) {
         boxMat.innerHTML = MESTRE_MATERIAIS.map(m => `
             <div class="item-list">
-                <div><strong>${m.codigo_material}</strong> - ${m.descricao} (Tubete: ${m.peso_tubete_padrao}kg)</div>
+                <div><strong>${m.codigo_material}</strong> - ${m.descricao}</div>
                 <button class="btn-small-delete" onclick="deletarRegistro('master_materiais', ${m.id})">X</button>
             </div>
         `).join('');
@@ -406,20 +450,13 @@ async function salvarMaterial() {
         codigo_material: document.getElementById('form-mat-cod').value.trim(),
         descricao: document.getElementById('form-mat-desc').value.trim(),
         tipo_material: document.getElementById('form-mat-tipo').value,
-        peso_tubete_padrao: parseFloat(document.getElementById('form-mat-tubete').value || 0),
+        peso_tubete_padrao: 0,
         peso_unitario_kg: parseFloat(document.getElementById('form-mat-peso-uni').value || 0),
         fator_conversao: parseFloat(document.getElementById('form-mat-fator').value || 0)
     };
 
-    await fetch(`${API_URL}/admin/materiais`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(payload)
-    });
-    fecharModal('modal-material');
-    await baixarDadosMestres();
-    renderizarGestao();
-    preencherSeletoresIniciais();
+    await fetch(`${API_URL}/admin/materiais`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+    fecharModal('modal-material'); await baixarDadosMestres(); renderizarGestao(); preencherSeletoresIniciais();
 }
 
 async function salvarLoteEstoque() {
@@ -430,62 +467,35 @@ async function salvarLoteEstoque() {
         peso_inicial: parseFloat(document.getElementById('form-lot-peso').value || 0)
     };
 
-    await fetch(`${API_URL}/admin/lotes`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(payload)
-    });
-    fecharModal('modal-lote');
-    alert("Nova bobina/lote cadastrado no estoque!");
+    await fetch(`${API_URL}/admin/lotes`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+    fecharModal('modal-lote'); alert("Nova bobina/lote cadastrado no estoque!");
 }
 
 async function salvarMaquina() {
-    const payload = {
-        numero_maquina: parseInt(document.getElementById('form-maq-num').value),
-        tipo: document.getElementById('form-maq-tipo').value,
-        ativo: true
-    };
-
-    await fetch(`${API_URL}/admin/maquinas`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(payload)
-    });
-    fecharModal('modal-maq');
-    await baixarDadosMestres();
-    renderizarGestao();
-    preencherSeletoresIniciais();
+    const payload = { numero_maquina: parseInt(document.getElementById('form-maq-num').value), tipo: document.getElementById('form-maq-tipo').value, ativo: true };
+    await fetch(`${API_URL}/admin/maquinas`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+    fecharModal('modal-maq'); await baixarDadosMestres(); renderizarGestao(); preencherSeletoresIniciais();
 }
 
 async function deletarRegistro(tabela, id) {
     if (!confirm("Confirmar exclusão?")) return;
     await fetch(`${API_URL}/admin/${tabela}/${id}`, { method: 'DELETE' });
-    await baixarDadosMestres();
-    renderizarGestao();
+    await baixarDadosMestres(); renderizarGestao();
 }
 
-// --- IMPORTADOR DA PLANILHA DE PARÂMETROS EXCEL (NOVO) ---
 function processarPlanilhaParametros() {
     const fileInput = document.getElementById('upload-excel-param');
     if (!fileInput || !fileInput.files.length) return alert("Selecione o arquivo Excel de parâmetros!");
 
-    const file = fileInput.files[0];
-    const reader = new FileReader();
+    const file = fileInput.files[0]; const reader = new FileReader();
     const btn = document.querySelector('button[onclick="processarPlanilhaParametros()"]');
-    const txtOriginal = btn.innerText;
-    btn.innerText = "Processando Excel...";
-    btn.disabled = true;
+    const txtOriginal = btn.innerText; btn.innerText = "Processando Excel..."; btn.disabled = true;
 
     reader.onload = function(e) {
         try {
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, {type: 'array'});
-            
-            // Pega a primeira aba
-            const firstSheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[firstSheetName];
-            
-            // Converte para JSON
+            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
             const json = XLSX.utils.sheet_to_json(worksheet);
             const payload = [];
 
@@ -494,172 +504,79 @@ function processarPlanilhaParametros() {
                 const desc = String(row['Descrição'] || '').trim();
                 const peso = parseFloat(row['Peso (kg)']) || 0.0;
                 const fator = parseFloat(row['Variável Raio']) || 0.0;
-
-                // Ignora a primeira linha suja que tem "0" ou está em branco
                 if (cod && cod !== '0' && cod.toLowerCase() !== 'nan') {
-                    payload.push({
-                        codigo_material: cod,
-                        descricao: desc || `Material ${cod}`,
-                        peso_unitario_kg: peso,
-                        fator_conversao: fator
-                    });
+                    payload.push({ codigo_material: cod, descricao: desc || `Material ${cod}`, peso_unitario_kg: peso, fator_conversao: fator });
                 }
             });
 
-            if (payload.length === 0) {
-                alert("Nenhum material válido encontrado na planilha.");
-                btn.innerText = txtOriginal; btn.disabled = false;
-                return;
-            }
+            if (payload.length === 0) { alert("Nenhum material válido encontrado na planilha."); btn.innerText = txtOriginal; btn.disabled = false; return; }
 
-            // Envia o JSON mastigado para a API salvar no banco
-            fetch(`${API_URL}/admin/materiais/importar-massa`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(payload)
-            })
-            .then(res => {
-                if(res.ok) return res.json();
-                throw new Error("Erro na importação");
-            })
-            .then(data => {
-                alert(`Sucesso!\n${data.importados} materiais atualizados com Fatores de Conversão e Pesos Unitários.`);
-                fileInput.value = '';
-                btn.innerText = txtOriginal; btn.disabled = false;
-                baixarDadosMestres(); 
-            })
-            .catch(err => {
-                alert("Erro ao enviar dados para o servidor.");
-                btn.innerText = txtOriginal; btn.disabled = false;
-            });
-
-        } catch (err) {
-            console.error(err);
-            alert("Erro ao ler o arquivo Excel. Verifique se o formato está correto.");
-            btn.innerText = txtOriginal; btn.disabled = false;
-        }
+            fetch(`${API_URL}/admin/materiais/importar-massa`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) })
+            .then(res => res.json()).then(data => {
+                alert(`Sucesso!\n${data.importados} materiais atualizados.`);
+                fileInput.value = ''; btn.innerText = txtOriginal; btn.disabled = false; baixarDadosMestres(); 
+            }).catch(() => { alert("Erro ao enviar dados."); btn.innerText = txtOriginal; btn.disabled = false; });
+        } catch (err) { alert("Erro ao ler Excel."); btn.innerText = txtOriginal; btn.disabled = false; }
     };
-
     reader.readAsArrayBuffer(file);
 }
 
-// --- FUNÇÃO AUXILIAR DE TRATAMENTO DE NÚMEROS DO TOTVS ---
 function tratarNumeroTotvs(valorTexto) {
-    if (!valorTexto) return 0.0;
-    let str = String(valorTexto).trim();
-    
-    // Se contiver vírgula e ponto (ex: "1.151,00") -> remove ponto de milhar e troca vírgula por ponto
-    if (str.includes(',') && str.includes('.')) {
-        str = str.replace(/\./g, '').replace(',', '.');
-    } else if (str.includes(',')) {
-        // Se só contiver vírgula (ex: "1151,00")
-        str = str.replace(',', '.');
-    }
-    // Se contiver apenas ponto (ex: XML nativo "2779.8"), MANTÉM o ponto!
+    if (!valorTexto) return 0.0; let str = String(valorTexto).trim();
+    if (str.includes(',') && str.includes('.')) str = str.replace(/\./g, '').replace(',', '.');
+    else if (str.includes(',')) str = str.replace(',', '.');
     return parseFloat(str) || 0.0;
 }
 
-// --- PARSER E IMPORTADOR NATIVO DO XML SB8 DO TOTVS PROTHEUS ---
 function processarArquivoTotvs() {
     const fileInput = document.getElementById('upload-xml-totvs');
-    if (!fileInput || !fileInput.files.length) return alert("Selecione o arquivo XML exportado da SB8!");
+    if (!fileInput || !fileInput.files.length) return alert("Selecione o arquivo XML da SB8!");
 
-    const file = fileInput.files[0];
-    const reader = new FileReader();
-
+    const file = fileInput.files[0]; const reader = new FileReader();
     reader.onload = async function(e) {
-        const text = e.target.result;
-        const listaLotes = [];
-        let ignoradosZerados = 0;
-
+        const text = e.target.result; const listaLotes = []; let ignoradosZerados = 0;
         try {
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(text, "text/xml");
+            const parser = new DOMParser(); const xmlDoc = parser.parseFromString(text, "text/xml");
             const rows = xmlDoc.getElementsByTagName("Row");
-
-            let idxProduto = -1;
-            let idxLote = -1;
-            let idxSaldo = -1;
+            let idxProduto = -1, idxLote = -1, idxSaldo = -1;
 
             for (let r = 0; r < rows.length; r++) {
-                const cells = rows[r].getElementsByTagName("Cell");
-                let rowData = [];
-                let colIdx = 0;
-
-                // Mapeia células do XML respeitando o atributo de índice ss:Index
+                const cells = rows[r].getElementsByTagName("Cell"); let rowData = []; let colIdx = 0;
                 for (let c = 0; c < cells.length; c++) {
                     const cellIndexAttr = cells[c].getAttribute("ss:Index");
-                    if (cellIndexAttr) {
-                        colIdx = parseInt(cellIndexAttr) - 1;
-                    }
+                    if (cellIndexAttr) colIdx = parseInt(cellIndexAttr) - 1;
                     const dataTag = cells[c].getElementsByTagName("Data")[0];
-                    rowData[colIdx] = dataTag ? dataTag.textContent.trim() : "";
-                    colIdx++;
+                    rowData[colIdx] = dataTag ? dataTag.textContent.trim() : ""; colIdx++;
                 }
 
-                // Identifica a linha de cabeçalho
                 if (idxProduto === -1 && rowData.some(v => v && v.toLowerCase().includes('produto'))) {
                     rowData.forEach((val, index) => {
-                        if (!val) return;
-                        const h = val.toLowerCase().trim();
+                        if (!val) return; const h = val.toLowerCase().trim();
                         if (h === 'produto' || h.includes('cod. produto')) idxProduto = index;
-                        if (h === 'lote') idxLote = index; // Pega estritamente a coluna Lote (nosso lote)
+                        if (h === 'lote') idxLote = index;
                         if (h.includes('saldo lote') || h.includes('sdo.lote')) idxSaldo = index;
                     });
                     continue;
                 }
 
-                // Mapeia os dados das bobinas/lotes
                 if (idxProduto !== -1 && idxLote !== -1) {
-                    const codMat = rowData[idxProduto];
-                    const loteNosso = rowData[idxLote];
-                    const saldoTexto = rowData[idxSaldo] || "0";
-
+                    const codMat = rowData[idxProduto], loteNosso = rowData[idxLote], saldoTexto = rowData[idxSaldo] || "0";
                     if (codMat && loteNosso) {
-                        // Converte utilizando o tratamento correto de número float
                         const pesoDisponivel = tratarNumeroTotvs(saldoTexto);
-
-                        // Importa apenas lotes que possuem saldo físico maior que ZERO
-                        if (pesoDisponivel > 0) {
-                            listaLotes.push({
-                                codigo_barras_lote: loteNosso, // Nosso Lote é a chave/barcode
-                                codigo_material: codMat,
-                                lote_fornecedor: loteNosso,
-                                peso_inicial: pesoDisponivel
-                            });
-                        } else {
-                            ignoradosZerados++;
-                        }
+                        if (pesoDisponivel > 0) listaLotes.push({ codigo_barras_lote: loteNosso, codigo_material: codMat, lote_fornecedor: loteNosso, peso_inicial: pesoDisponivel });
+                        else ignoradosZerados++;
                     }
                 }
             }
 
-            if (listaLotes.length === 0) {
-                return alert("Nenhum lote com saldo maior que zero foi encontrado no arquivo.");
-            }
+            if (listaLotes.length === 0) return alert("Nenhum lote com saldo encontrado.");
 
-            // Envia em massa para o banco de dados
-            const res = await fetch(`${API_URL}/admin/lotes/importar-massa`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(listaLotes)
-            });
-
+            const res = await fetch(`${API_URL}/admin/lotes/importar-massa`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(listaLotes) });
             if (res.ok) {
-                const data = await res.json();
-                alert(`Carga SB8 Concluída com Sucesso!\n\nLotes Ativos Importados: ${data.importados}\nLotes Zerados Ignorados: ${ignoradosZerados}`);
-                fileInput.value = '';
-                await baixarDadosMestres();
-            } else {
-                const err = await res.json();
-                alert(`Erro ao importar lotes: ${err.detail}`);
-            }
-
-        } catch (err) {
-            console.error(err);
-            alert("Erro ao ler o arquivo XML. Certifique-se de que é a exportação original da tabela SB8.");
-        }
+                const data = await res.json(); alert(`Carga SB8 Concluída!\n\nLotes Ativos: ${data.importados}\nZerados Ignorados: ${ignoradosZerados}`);
+                fileInput.value = ''; await baixarDadosMestres();
+            } else { const err = await res.json(); alert(`Erro: ${err.detail}`); }
+        } catch (err) { alert("Erro ao ler o arquivo XML."); }
     };
-
     reader.readAsText(file, "UTF-8");
 }
