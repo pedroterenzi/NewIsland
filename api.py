@@ -47,18 +47,20 @@ def inicializar_banco():
             );
         """)
         
-        # 3. Cadastro Mestre de Materiais (TNT, SAP, Cola, Lycra)
+        # 3. Cadastro Mestre de Materiais
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS master_materiais (
                 id SERIAL PRIMARY KEY,
                 codigo_material VARCHAR(100) UNIQUE NOT NULL,
                 descricao VARCHAR(255) NOT NULL,
                 tipo_material VARCHAR(50) NOT NULL,
-                peso_tubete_padrao NUMERIC(12,3) DEFAULT 0.000
+                peso_tubete_padrao NUMERIC(12,3) DEFAULT 0.000,
+                peso_unitario_kg NUMERIC(12,3) DEFAULT 0.000,
+                fator_conversao NUMERIC(15,8) DEFAULT 0.00000000
             );
         """)
 
-        # 4. Lotes e Bobinas em Estoque / WIP (Capacidade expandida NUMERIC(12,3))
+        # 4. Lotes e Bobinas em Estoque
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS lotes_estoque (
                 id SERIAL PRIMARY KEY,
@@ -72,7 +74,7 @@ def inicializar_banco():
             );
         """)
 
-        # 5. Consumo Real por Ordem de Produção (Scan & Play)
+        # 5. Consumo Real por Ordem de Produção
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS consumo_op_lote (
                 id SERIAL PRIMARY KEY,
@@ -90,7 +92,7 @@ def inicializar_banco():
             );
         """)
 
-        # 6. Apontamento de Refugo (Scrap) de Fraldas
+        # 6. Apontamento de Refugo
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS apontamento_refugo (
                 id SERIAL PRIMARY KEY,
@@ -103,7 +105,7 @@ def inicializar_banco():
             );
         """)
 
-        # ALTERAÇÃO AUTOMÁTICA DE COLUNAS EXISTENTES (Evita erro NUMERIC OVERFLOW no PostgreSQL)
+        # ALTERAÇÃO AUTOMÁTICA DE COLUNAS EXISTENTES
         try:
             cursor.execute("ALTER TABLE master_materiais ALTER COLUMN peso_tubete_padrao TYPE NUMERIC(12,3);")
             cursor.execute("ALTER TABLE lotes_estoque ALTER COLUMN peso_inicial TYPE NUMERIC(12,3);")
@@ -112,6 +114,8 @@ def inicializar_banco():
             cursor.execute("ALTER TABLE consumo_op_lote ALTER COLUMN peso_devolvido TYPE NUMERIC(12,3);")
             cursor.execute("ALTER TABLE consumo_op_lote ALTER COLUMN consumo_real TYPE NUMERIC(12,3);")
             cursor.execute("ALTER TABLE apontamento_refugo ALTER COLUMN peso_refugo_kg TYPE NUMERIC(12,3);")
+            cursor.execute("ALTER TABLE master_materiais ADD COLUMN IF NOT EXISTS peso_unitario_kg NUMERIC(12,3) DEFAULT 0.000;")
+            cursor.execute("ALTER TABLE master_materiais ADD COLUMN IF NOT EXISTS fator_conversao NUMERIC(15,8) DEFAULT 0.00000000;")
         except Exception as err_alter:
             print(f"Aviso na alteracao de colunas: {err_alter}")
         
@@ -151,6 +155,8 @@ class ModelMaterial(BaseModel):
     descricao: str
     tipo_material: str
     peso_tubete_padrao: float
+    peso_unitario_kg: float
+    fator_conversao: float
 
 class ModelLoteEstoque(BaseModel):
     codigo_barras_lote: str
@@ -274,7 +280,7 @@ def consultar_lote_ativo_para_devolver(codigo_barras: str):
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         cursor.execute("""
             SELECT c.id as consumo_id, c.ordem_producao, c.maquina_numero, c.peso_alocado, c.codigo_barras_lote,
-                   l.codigo_material, m.descricao, m.peso_tubete_padrao, l.lote_fornecedor
+                   l.codigo_material, m.descricao, m.peso_tubete_padrao, l.lote_fornecedor, m.fator_conversao
             FROM consumo_op_lote c
             JOIN lotes_estoque l ON c.codigo_barras_lote = l.codigo_barras_lote
             JOIN master_materiais m ON l.codigo_material = m.codigo_material
@@ -303,15 +309,24 @@ def confirmar_abastecimento(obj: ModelAbastecerConfirmar):
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         
-        cursor.execute("SELECT * FROM lotes_estoque WHERE codigo_barras_lote = %s AND status = 'em_estoque';", (obj.codigo_barras_lote.strip(),))
+        cursor.execute("""
+            SELECT l.*, m.peso_unitario_kg 
+            FROM lotes_estoque l 
+            JOIN master_materiais m ON l.codigo_material = m.codigo_material 
+            WHERE l.codigo_barras_lote = %s AND l.status = 'em_estoque';
+        """, (obj.codigo_barras_lote.strip(),))
         lote = cursor.fetchone()
+        
         if not lote:
             raise HTTPException(status_code=400, detail="Lote não disponível para abastecimento.")
+
+        # APONTA APENAS O PESO UNITÁRIO CADASTRADO (1 Bobina)
+        peso_uma_bobina = lote['peso_unitario_kg']
 
         cursor.execute("""
             INSERT INTO consumo_op_lote (ordem_producao, maquina_numero, codigo_barras_lote, peso_alocado, operador)
             VALUES (%s, %s, %s, %s, %s) RETURNING id;
-        """, (obj.ordem_producao.strip(), obj.maquina_numero, obj.codigo_barras_lote.strip(), lote['peso_atual'], obj.operador))
+        """, (obj.ordem_producao.strip(), obj.maquina_numero, obj.codigo_barras_lote.strip(), peso_uma_bobina, obj.operador))
         
         cursor.execute("UPDATE lotes_estoque SET status = 'em_linha' WHERE codigo_barras_lote = %s;", (obj.codigo_barras_lote.strip(),))
         
@@ -493,9 +508,9 @@ def criar_material(m: ModelMaterial):
     cursor = conn.cursor()
     try:
         cursor.execute("""
-            INSERT INTO master_materiais (codigo_material, descricao, tipo_material, peso_tubete_padrao)
-            VALUES (%s, %s, %s, %s);
-        """, (m.codigo_material, m.descricao, m.tipo_material, m.peso_tubete_padrao))
+            INSERT INTO master_materiais (codigo_material, descricao, tipo_material, peso_tubete_padrao, peso_unitario_kg, fator_conversao)
+            VALUES (%s, %s, %s, %s, %s, %s);
+        """, (m.codigo_material, m.descricao, m.tipo_material, m.peso_tubete_padrao, m.peso_unitario_kg, m.fator_conversao))
         conn.commit()
         cursor.close()
         return {"status": "sucesso"}
@@ -538,8 +553,8 @@ def importar_lotes_massa(lotes: List[ItemImportacaoMassa]):
 
             # 1. Garante que o material exista no cadastro mestre para evitar erro de Foreign Key
             cursor.execute("""
-                INSERT INTO master_materiais (codigo_material, descricao, tipo_material, peso_tubete_padrao)
-                VALUES (%s, %s, 'bobina', 0.00)
+                INSERT INTO master_materiais (codigo_material, descricao, tipo_material, peso_tubete_padrao, peso_unitario_kg, fator_conversao)
+                VALUES (%s, %s, 'bobina', 0.00, 0.00, 0.00)
                 ON CONFLICT (codigo_material) DO NOTHING;
             """, (cod_mat, f"Material {cod_mat} (TOTVS)"))
 
