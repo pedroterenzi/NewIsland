@@ -54,19 +54,19 @@ def inicializar_banco():
                 codigo_material VARCHAR(100) UNIQUE NOT NULL,
                 descricao VARCHAR(255) NOT NULL,
                 tipo_material VARCHAR(50) NOT NULL,
-                peso_tubete_padrao NUMERIC(6,2) DEFAULT 0.00
+                peso_tubete_padrao NUMERIC(12,3) DEFAULT 0.000
             );
         """)
 
-        # 4. Lotes e Bobinas em Estoque / WIP
+        # 4. Lotes e Bobinas em Estoque / WIP (Capacidade expandida NUMERIC(12,3))
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS lotes_estoque (
                 id SERIAL PRIMARY KEY,
                 codigo_barras_lote VARCHAR(100) UNIQUE NOT NULL,
                 codigo_material VARCHAR(100) REFERENCES master_materiais(codigo_material) ON DELETE CASCADE,
                 lote_fornecedor VARCHAR(100) NOT NULL,
-                peso_inicial NUMERIC(8,2) NOT NULL,
-                peso_atual NUMERIC(8,2) NOT NULL,
+                peso_inicial NUMERIC(12,3) NOT NULL,
+                peso_atual NUMERIC(12,3) NOT NULL,
                 status VARCHAR(50) DEFAULT 'em_estoque',
                 data_entrada TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
@@ -79,9 +79,9 @@ def inicializar_banco():
                 ordem_producao VARCHAR(100) NOT NULL,
                 maquina_numero INT NOT NULL,
                 codigo_barras_lote VARCHAR(100) REFERENCES lotes_estoque(codigo_barras_lote) ON DELETE CASCADE,
-                peso_alocado NUMERIC(8,2) NOT NULL,
-                peso_devolvido NUMERIC(8,2) DEFAULT 0,
-                consumo_real NUMERIC(8,2) DEFAULT 0,
+                peso_alocado NUMERIC(12,3) NOT NULL,
+                peso_devolvido NUMERIC(12,3) DEFAULT 0,
+                consumo_real NUMERIC(12,3) DEFAULT 0,
                 operador VARCHAR(255) NOT NULL,
                 data_inicio TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 data_fim TIMESTAMP,
@@ -96,12 +96,24 @@ def inicializar_banco():
                 id SERIAL PRIMARY KEY,
                 ordem_producao VARCHAR(100) NOT NULL,
                 maquina_numero INT NOT NULL,
-                peso_refugo_kg NUMERIC(8,2) NOT NULL,
+                peso_refugo_kg NUMERIC(12,3) NOT NULL,
                 tipo_refugo VARCHAR(100) NOT NULL,
                 operador VARCHAR(255) NOT NULL,
                 data_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
+
+        # ALTERAÇÃO AUTOMÁTICA DE COLUNAS EXISTENTES (Evita erro NUMERIC OVERFLOW no PostgreSQL)
+        try:
+            cursor.execute("ALTER TABLE master_materiais ALTER COLUMN peso_tubete_padrao TYPE NUMERIC(12,3);")
+            cursor.execute("ALTER TABLE lotes_estoque ALTER COLUMN peso_inicial TYPE NUMERIC(12,3);")
+            cursor.execute("ALTER TABLE lotes_estoque ALTER COLUMN peso_atual TYPE NUMERIC(12,3);")
+            cursor.execute("ALTER TABLE consumo_op_lote ALTER COLUMN peso_alocado TYPE NUMERIC(12,3);")
+            cursor.execute("ALTER TABLE consumo_op_lote ALTER COLUMN peso_devolvido TYPE NUMERIC(12,3);")
+            cursor.execute("ALTER TABLE consumo_op_lote ALTER COLUMN consumo_real TYPE NUMERIC(12,3);")
+            cursor.execute("ALTER TABLE apontamento_refugo ALTER COLUMN peso_refugo_kg TYPE NUMERIC(12,3);")
+        except Exception as err_alter:
+            print(f"Aviso na alteracao de colunas: {err_alter}")
         
         # Garante o admin padrão
         cursor.execute("SELECT id FROM usuarios WHERE login = 'admin';")
