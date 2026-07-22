@@ -275,18 +275,16 @@ function calcularPesoDevolucao() {
     document.getElementById('dev-peso-manual').value = pesoEstimado.toFixed(2);
 }
 
-// NOVA FUNÇÃO: Calculadora de apoio para Transferência Sistêmica
+// Calculadora de apoio para Transferência Sistêmica
 function calcularPesoTransferencia() {
     if (!consumoAtivoDevolucao) return;
 
     let pesoTotal = 0;
     
-    // 1. Calcula bobinas inteiras
     const qtdInteiras = parseInt(document.getElementById('dev-sist-qtd-inteiras').value) || 0;
     const pesoUnitario = parseFloat(consumoAtivoDevolucao.peso_unitario_kg) || 0;
     pesoTotal += (qtdInteiras * pesoUnitario);
 
-    // 2. Calcula bobina parcial
     const diamExtCm = parseFloat(document.getElementById('dev-sist-diam-ext').value) || 0;
     const diamTubCm = parseFloat(document.getElementById('dev-sist-diam-tub').value) || 0;
     const fatorConversao = parseFloat(consumoAtivoDevolucao.fator_conversao) || 0;
@@ -301,11 +299,9 @@ function calcularPesoTransferencia() {
         }
     }
 
-    // 3. Atualiza o campo final editável
     if (pesoTotal > 0) {
         document.getElementById('dev-peso-transferido').value = pesoTotal.toFixed(2);
     } else {
-        // Limpa se o usuário apagou os campos do ajudante, para não sobrescrever se ele estiver digitando manualmente
         if (document.getElementById('dev-sist-qtd-inteiras').value === '' && document.getElementById('dev-sist-diam-ext').value === '') {
              document.getElementById('dev-peso-transferido').value = '';
         }
@@ -388,7 +384,6 @@ function resetarTelaDevolucao() {
     document.getElementById('dev-nova-op').value = '';
     document.getElementById('dev-peso-transferido').value = '';
     
-    // Limpar novos campos da calculadora de transferência
     document.getElementById('dev-sist-qtd-inteiras').value = '';
     document.getElementById('dev-sist-diam-ext').value = '';
     document.getElementById('dev-sist-diam-tub').value = '9.45';
@@ -647,7 +642,7 @@ function processarPlanilhaParametros() {
     reader.readAsArrayBuffer(file);
 }
 
-// --- PARSER E IMPORTADOR NATIVO DO XML SB8 DO TOTVS PROTHEUS ---
+// --- PARSER E IMPORTADOR NATIVO DO XML SB8 DO TOTVS PROTHEUS (ATUALIZADO) ---
 function tratarNumeroTotvs(valorTexto) {
     if (!valorTexto) return 0.0;
     let str = String(valorTexto).trim();
@@ -668,7 +663,7 @@ function processarArquivoTotvs() {
 
     reader.onload = async function(e) {
         const text = e.target.result;
-        const listaLotes = [];
+        const lotesAgrupados = {}; // Objeto para somar os armazéns do mesmo lote
         let ignoradosZerados = 0;
 
         try {
@@ -715,18 +710,28 @@ function processarArquivoTotvs() {
                         const pesoDisponivel = tratarNumeroTotvs(saldoTexto);
 
                         if (pesoDisponivel > 0) {
-                            listaLotes.push({
-                                codigo_barras_lote: loteNosso, 
-                                codigo_material: codMat,
-                                lote_fornecedor: loteNosso,
-                                peso_inicial: pesoDisponivel
-                            });
+                            // AGRUPAMENTO: Soma todos os saldos de diferentes armazéns num único lote
+                            if (!lotesAgrupados[loteNosso]) {
+                                lotesAgrupados[loteNosso] = {
+                                    codigo_barras_lote: loteNosso, 
+                                    codigo_material: codMat,
+                                    lote_fornecedor: loteNosso,
+                                    peso_inicial: 0
+                                };
+                            }
+                            lotesAgrupados[loteNosso].peso_inicial += pesoDisponivel;
                         } else {
                             ignoradosZerados++;
                         }
                     }
                 }
             }
+
+            // Transforma o objeto agrupado de volta num array limpo para mandar pra API
+            const listaLotes = Object.values(lotesAgrupados).map(l => ({
+                ...l,
+                peso_inicial: parseFloat(l.peso_inicial.toFixed(3)) // Garante que a soma não dê erro de dízima (ex: 48.7000001)
+            }));
 
             if (listaLotes.length === 0) {
                 return alert("Nenhum lote com saldo maior que zero foi encontrado no arquivo.");
@@ -740,7 +745,7 @@ function processarArquivoTotvs() {
 
             if (res.ok) {
                 const data = await res.json();
-                alert(`Carga SB8 Concluída com Sucesso!\n\nLotes Ativos Importados: ${data.importados}\nLotes Zerados Ignorados: ${ignoradosZerados}`);
+                alert(`Carga SB8 Concluída com Sucesso!\n\nLotes Únicos Importados (Armazéns somados): ${data.importados}\nLinhas Zeradas Ignoradas: ${ignoradosZerados}`);
                 fileInput.value = '';
                 await baixarDadosMestres();
             } else {
@@ -752,6 +757,10 @@ function processarArquivoTotvs() {
             console.error(err);
             alert("Erro ao ler o arquivo XML. Certifique-se de que é a exportação original da tabela SB8.");
         }
+    };
+
+    reader.readAsText(file, "UTF-8");
+}
     };
 
     reader.readAsText(file, "UTF-8");
