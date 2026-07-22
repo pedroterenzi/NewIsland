@@ -194,6 +194,13 @@ class ItemImportacaoMassa(BaseModel):
     lote_fornecedor: str
     peso_inicial: float
 
+# NOVA CLASSE PARA IMPORTAÇÃO DA PLANILHA DE PARÂMETROS
+class ItemImportacaoMaterial(BaseModel):
+    codigo_material: str
+    descricao: str
+    peso_unitario_kg: float
+    fator_conversao: float
+
 # --- AUTENTICAÇÃO E MESTRES ---
 @app.post("/usuarios/auth")
 def autenticar(obj: ModelAuth):
@@ -538,7 +545,45 @@ def cadastrar_lote(l: ModelLoteEstoque):
     finally:
         conn.close()
 
-# --- ENDPOINT IMPORTAÇÃO EM MASSA (XML TOTVS SB8) ---
+# ENDPOINT NOVO: IMPORTAÇÃO DA PLANILHA EXCEL DE PARÂMETROS
+@app.post("/admin/materiais/importar-massa")
+def importar_materiais_massa(materiais: List[ItemImportacaoMaterial]):
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cont_importados = 0
+
+        for item in materiais:
+            cod_mat = item.codigo_material.strip()
+            
+            # Se for nulo ou 'nan' (sujeira do excel), pula a linha
+            if not cod_mat or cod_mat.lower() == 'nan':
+                continue
+
+            # UPSERT: Se não existe, insere. Se existe, atualiza SÓ OS FATORES
+            cursor.execute("""
+                INSERT INTO master_materiais (codigo_material, descricao, tipo_material, peso_tubete_padrao, peso_unitario_kg, fator_conversao)
+                VALUES (%s, %s, 'bobina', 0.00, %s, %s)
+                ON CONFLICT (codigo_material) 
+                DO UPDATE SET 
+                    peso_unitario_kg = EXCLUDED.peso_unitario_kg,
+                    fator_conversao = EXCLUDED.fator_conversao;
+            """, (cod_mat, item.descricao.strip(), item.peso_unitario_kg, item.fator_conversao))
+            
+            cont_importados += 1
+
+        conn.commit()
+        cursor.close()
+        return {"status": "sucesso", "importados": cont_importados}
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: conn.close()
+
+
+# ENDPOINT IMPORTAÇÃO EM MASSA (XML TOTVS SB8)
 @app.post("/admin/lotes/importar-massa")
 def importar_lotes_massa(lotes: List[ItemImportacaoMassa]):
     conn = None
@@ -551,7 +596,9 @@ def importar_lotes_massa(lotes: List[ItemImportacaoMassa]):
             cod_mat = item.codigo_material.strip()
             barcode = item.codigo_barras_lote.strip()
 
-            # 1. Garante que o material exista no cadastro mestre para evitar erro de Foreign Key
+            # 1. Garante que o material exista. Note o DO NOTHING:
+            # Se ele já existir no banco (vindo da sua planilha do Excel com os fatores reais),
+            # o TOTVS NÃO vai zerar os fatores dele! 
             cursor.execute("""
                 INSERT INTO master_materiais (codigo_material, descricao, tipo_material, peso_tubete_padrao, peso_unitario_kg, fator_conversao)
                 VALUES (%s, %s, 'bobina', 0.00, 0.00, 0.00)
