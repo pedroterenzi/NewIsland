@@ -180,11 +180,22 @@
                     </select>
                 </div>
 
-                <!-- CAMPO FÍSICO -->
+                <!-- CAMPO FÍSICO (CÁLCULO POR CENTÍMETROS) -->
                 <div id="box-dev-fisica" class="form-group">
-                    <label>Peso Bruto Medido na Balança (kg):</label>
-                    <input type="number" id="dev-peso-manual" step="0.1" placeholder="Informe o peso pesado na balança">
-                    <p style="font-size:11px; color:var(--text-muted); margin-top:4px;">*O peso do tubete será descontado automaticamente pelo sistema.</p>
+                    <label>Diâmetro Externo Medido na Máquina (cm):</label>
+                    <input type="number" id="dev-diam-ext" step="0.1" placeholder="Ex: 42.5" oninput="calcularPesoDevolucao()">
+                    
+                    <label style="margin-top: 10px;">Diâmetro do Tubete (cm):</label>
+                    <input type="number" id="dev-diam-tub" step="0.1" placeholder="Ex: 9.45" value="9.45" oninput="calcularPesoDevolucao()">
+                    
+                    <!-- Box verde que mostra o resultado ao vivo -->
+                    <div class="resumo-box" style="margin-top: 15px; padding: 16px; background: rgba(16, 185, 129, 0.1); border-color: var(--success-color);">
+                        <div style="font-size: 13px; font-weight: 600; color: var(--success-color); margin-bottom: 4px;">Peso Restante Calculado:</div>
+                        <strong id="dev-peso-calculado" style="color: #fff; font-size: 22px;">0.00 kg</strong>
+                    </div>
+                    
+                    <!-- O valor real calculado vai ficar escondido aqui para ser enviado ao banco -->
+                    <input type="hidden" id="dev-peso-manual">
                 </div>
 
                 <!-- CAMPO SISTÊMICO (TRANSFERÊNCIA) -->
@@ -298,6 +309,8 @@
             </select>
         </div>
         <div class="form-group"><label>Peso Tubete (kg):</label><input type="number" id="form-mat-tubete" step="0.1" value="0.0"></div>
+        <div class="form-group"><label>Peso de 1 Bobina (kg):</label><input type="number" id="form-mat-peso-uni" step="0.1" placeholder="Ex: 23.8"></div>
+        <div class="form-group"><label>Fator de Conversão (Variável Raio):</label><input type="number" id="form-mat-fator" step="0.00000001" placeholder="Ex: 0.013379342"></div>
         <button class="btn-blue" onclick="salvarMaterial()" style="margin-top: 8px;">Salvar Material</button>
         <button class="btn-dash" style="margin-top:12px; border-color:var(--text-muted); color:var(--text-muted);" onclick="fecharModal('modal-material')">Cancelar</button>
     </div>
