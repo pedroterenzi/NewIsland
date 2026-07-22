@@ -223,7 +223,7 @@
                 <input type="number" id="dev-peso-etiqueta" step="0.1" placeholder="Ex: 180.5" oninput="calcularPesoDevolucao()">
             </div>
 
-            <!-- RESULTADO DO CÁLCULO -->
+            <!-- RESULTADO DO CÁLCULO FÍSICO -->
             <div id="box-resultado-fisico" class="resumo-box" style="margin-top: 15px; padding: 16px; background: rgba(16, 185, 129, 0.1); border-color: var(--success-color);">
                 <div style="font-size: 13px; font-weight: 600; color: var(--success-color); margin-bottom: 4px;">Peso Líquido Restante Retornando ao Lote:</div>
                 <strong id="dev-peso-calculado" style="color: #fff; font-size: 22px;">0.00 kg</strong>
@@ -234,9 +234,29 @@
             <!-- CAMPO SISTÊMICO (TRANSFERÊNCIA) -->
             <div id="box-dev-sistemica" class="form-group escondido">
                 <label>Nova Ordem de Produção Destino (OP Y):</label>
-                <input type="text" id="dev-nova-op" placeholder="Digite a nova OP de destino">
-                <label style="margin-top:10px;">Quantidade Mantida na Máquina (kg):</label>
-                <input type="number" id="dev-peso-transferido" step="0.1" placeholder="Sobra mantida para a próxima OP">
+                <input type="text" id="dev-nova-op" placeholder="Digite a nova OP de destino" style="margin-bottom: 15px;">
+                
+                <!-- CALCULADORA DE APOIO PARA TRANSFERÊNCIA SISTÊMICA -->
+                <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); padding: 15px; border-radius: 12px; margin-bottom: 15px;">
+                    <label style="color: var(--accent-blue); margin-bottom: 12px; display: block; font-size: 14px;">Calculadora de Apoio (Opcional):</label>
+                    <div style="margin-bottom: 12px;">
+                        <label style="font-size: 11px;">Bobinas Inteiras a Transferir:</label>
+                        <input type="number" id="dev-sist-qtd-inteiras" step="1" placeholder="Ex: 4" oninput="calcularPesoTransferencia()">
+                    </div>
+                    <div class="grid-2" style="gap: 10px;">
+                        <div>
+                            <label style="font-size: 11px;">Medida Parcial (cm):</label>
+                            <input type="number" id="dev-sist-diam-ext" step="0.1" placeholder="Ext: 42.5" oninput="calcularPesoTransferencia()">
+                        </div>
+                        <div>
+                            <label style="font-size: 11px;">Tubete (cm):</label>
+                            <input type="number" id="dev-sist-diam-tub" step="0.1" placeholder="Tub: 9.45" value="9.45" oninput="calcularPesoTransferencia()">
+                        </div>
+                    </div>
+                </div>
+
+                <label style="color: var(--success-color);">Quantidade Final a Transferir (kg):</label>
+                <input type="number" id="dev-peso-transferido" step="0.1" placeholder="Calculado acima ou digitado livremente" style="border-color: var(--success-color);">
             </div>
 
             <button class="btn-orange" onclick="executarDevolucao()" style="margin-top:15px;">Finalizar Processo de Devolução</button>
