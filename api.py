@@ -278,7 +278,6 @@ def consultar_lote_para_abastecer(codigo_barras: str):
         if conn:
             conn.close()
 
-# AGORA A BUSCA ATIVA EXIGE A OP DE ORIGEM (Para suportar o mesmo lote em OPs diferentes)
 @app.get("/consumo/buscar-ativo/{op}/{codigo_barras}")
 def consultar_lote_ativo_para_devolver(op: str, codigo_barras: str):
     conn = None
@@ -286,7 +285,6 @@ def consultar_lote_ativo_para_devolver(op: str, codigo_barras: str):
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         
-        # Pega a última entrada "em_uso" daquela Etiqueta naquela OP específica
         cursor.execute("""
             SELECT c.id as consumo_id, c.ordem_producao, c.maquina_numero, c.peso_alocado, c.codigo_barras_lote,
                    l.codigo_material, m.descricao, m.peso_unitario_kg, l.lote_fornecedor, m.fator_conversao
@@ -337,13 +335,11 @@ def confirmar_abastecimento(obj: ModelAbastecerConfirmar):
         if peso_apontado > peso_disponivel:
             raise HTTPException(status_code=400, detail=f"Peso apontado maior que o saldo disponível no lote ({peso_disponivel} kg).")
 
-        # Insere consumo apontando exatamente o peso digitado pelo operador
         cursor.execute("""
             INSERT INTO consumo_op_lote (ordem_producao, maquina_numero, codigo_barras_lote, peso_alocado, operador)
             VALUES (%s, %s, %s, %s, %s) RETURNING id;
         """, (obj.ordem_producao.strip(), obj.maquina_numero, obj.codigo_barras_lote.strip(), peso_apontado, obj.operador))
         
-        # Debita do estoque central
         novo_peso_lote = peso_disponivel - peso_apontado
         novo_status = 'em_estoque' if novo_peso_lote > 0 else 'consumido'
         
@@ -398,7 +394,6 @@ def devolver_sobra_fisica(obj: ModelDevolucaoFisica):
             WHERE id = %s;
         """, (sobra_liquida, consumo_real, obj.consumo_id))
 
-        # Credita o lote de volta com o que sobrou
         cursor.execute("""
             UPDATE lotes_estoque 
             SET peso_atual = peso_atual + %s, status = 'em_estoque' 
@@ -442,7 +437,6 @@ def transferir_sistemico_op(obj: ModelDevolucaoSistemica):
             
         consumo_real_origem = peso_alocado - peso_transferido
 
-        # 1. Encerra a OP de Origem debitando apenas o consumido real
         cursor.execute("""
             UPDATE consumo_op_lote 
             SET peso_devolvido = %s, consumo_real = %s, status = 'transferido', 
@@ -450,7 +444,6 @@ def transferir_sistemico_op(obj: ModelDevolucaoSistemica):
             WHERE id = %s;
         """, (peso_transferido, consumo_real_origem, obj.nova_ordem_destino.strip(), obj.consumo_id))
 
-        # 2. Cria automaticamente o apontamento de entrada na Nova OP
         cursor.execute("""
             INSERT INTO consumo_op_lote (ordem_producao, maquina_numero, codigo_barras_lote, peso_alocado, operador)
             VALUES (%s, %s, %s, %s, %s);
@@ -491,16 +484,12 @@ def apontar_refugo(obj: ModelRefugo):
     finally:
         if conn: conn.close()
 
-# NOVA VISÃO OP: RESUMO AGRUPADO POR LOTE
 @app.get("/visao-ordens/{op}")
 def visao_ordem_detalhe(op: str):
     conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
-        
-        # Agrupa pelo código de barras e soma os alocados/devolvidos.
-        # Se um lote ainda estiver 'em_uso', o consumo real assumido dele no momento é o peso alocado.
         cursor.execute("""
             SELECT 
                 c.codigo_barras_lote, 
@@ -565,7 +554,6 @@ def cadastrar_lote(l: ModelLoteEstoque):
     finally:
         conn.close()
 
-# ENDPOINT: IMPORTAÇÃO DA PLANILHA EXCEL DE PARÂMETROS
 @app.post("/admin/materiais/importar-massa")
 def importar_materiais_massa(materiais: List[ItemImportacaoMaterial]):
     conn = None
@@ -576,12 +564,9 @@ def importar_materiais_massa(materiais: List[ItemImportacaoMaterial]):
 
         for item in materiais:
             cod_mat = item.codigo_material.strip()
-            
-            # Se for nulo ou 'nan' (sujeira do excel), pula a linha
             if not cod_mat or cod_mat.lower() == 'nan':
                 continue
 
-            # UPSERT: Se não existe, insere. Se existe, atualiza SÓ OS FATORES
             cursor.execute("""
                 INSERT INTO master_materiais (codigo_material, descricao, tipo_material, peso_tubete_padrao, peso_unitario_kg, fator_conversao)
                 VALUES (%s, %s, 'bobina', 0.00, %s, %s)
@@ -602,7 +587,6 @@ def importar_materiais_massa(materiais: List[ItemImportacaoMaterial]):
     finally:
         if conn: conn.close()
 
-# ENDPOINT IMPORTAÇÃO EM MASSA (XML TOTVS SB8)
 @app.post("/admin/lotes/importar-massa")
 def importar_lotes_massa(lotes: List[ItemImportacaoMassa]):
     conn = None
