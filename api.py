@@ -26,6 +26,7 @@ def inicializar_banco():
         conn = get_db_connection()
         cursor = conn.cursor()
         
+        # 1. Usuários
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS usuarios (
                 id SERIAL PRIMARY KEY, 
@@ -36,6 +37,7 @@ def inicializar_banco():
             );
         """)
         
+        # 2. Máquinas
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS maquinas (
                 id SERIAL PRIMARY KEY, 
@@ -45,6 +47,7 @@ def inicializar_banco():
             );
         """)
         
+        # 3. Cadastro Mestre de Materiais
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS master_materiais (
                 id SERIAL PRIMARY KEY,
@@ -57,6 +60,7 @@ def inicializar_banco():
             );
         """)
 
+        # 4. Lotes e Bobinas em Estoque
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS lotes_estoque (
                 id SERIAL PRIMARY KEY,
@@ -70,6 +74,7 @@ def inicializar_banco():
             );
         """)
 
+        # 5. Consumo Real por Ordem de Produção
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS consumo_op_lote (
                 id SERIAL PRIMARY KEY,
@@ -87,6 +92,7 @@ def inicializar_banco():
             );
         """)
 
+        # 6. Apontamento de Refugo
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS apontamento_refugo (
                 id SERIAL PRIMARY KEY,
@@ -99,6 +105,7 @@ def inicializar_banco():
             );
         """)
 
+        # ALTERAÇÃO AUTOMÁTICA DE COLUNAS EXISTENTES
         try:
             cursor.execute("ALTER TABLE master_materiais ALTER COLUMN peso_tubete_padrao TYPE NUMERIC(12,3);")
             cursor.execute("ALTER TABLE lotes_estoque ALTER COLUMN peso_inicial TYPE NUMERIC(12,3);")
@@ -112,6 +119,7 @@ def inicializar_banco():
         except Exception as err_alter:
             print(f"Aviso na alteracao de colunas: {err_alter}")
         
+        # Garante o admin padrão
         cursor.execute("SELECT id FROM usuarios WHERE login = 'admin';")
         if not cursor.fetchone():
             cursor.execute("INSERT INTO usuarios (login, senha, nome, nivel) VALUES ('admin', 'admin', 'Administrador Global', 3);")
@@ -186,6 +194,7 @@ class ItemImportacaoMassa(BaseModel):
     codigo_material: str
     lote_fornecedor: str
     peso_inicial: float
+    descricao_material: Optional[str] = None
 
 class ItemImportacaoMaterial(BaseModel):
     codigo_material: str
@@ -516,8 +525,6 @@ def limpar_estoque():
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        # Coloca tudo que estava disponivel (em_estoque) como 'consumido' com peso zero
-        # Isso garante que as foreign keys e o histórico não se quebrem
         cursor.execute("UPDATE lotes_estoque SET peso_atual = 0, status = 'consumido' WHERE status = 'em_estoque';")
         conn.commit()
         cursor.close()
@@ -608,12 +615,15 @@ def importar_lotes_massa(lotes: List[ItemImportacaoMassa]):
         for item in lotes:
             cod_mat = item.codigo_material.strip()
             barcode = item.codigo_barras_lote.strip()
+            
+            # Pega a descricao vinda do Excel se tiver, senao coloca padrão
+            desc_mat = item.descricao_material.strip() if item.descricao_material else f"Material {cod_mat} (Importado)"
 
             cursor.execute("""
                 INSERT INTO master_materiais (codigo_material, descricao, tipo_material, peso_tubete_padrao, peso_unitario_kg, fator_conversao)
                 VALUES (%s, %s, 'bobina', 0.00, 0.00, 0.00)
                 ON CONFLICT (codigo_material) DO NOTHING;
-            """, (cod_mat, f"Material {cod_mat} (TOTVS)"))
+            """, (cod_mat, desc_mat))
 
             cursor.execute("""
                 INSERT INTO lotes_estoque (codigo_barras_lote, codigo_material, lote_fornecedor, peso_inicial, peso_atual, status)
