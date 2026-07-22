@@ -174,7 +174,7 @@ async function confirmarAbastecimentoLote() {
         if (res.ok) {
             alert(`Sucesso! ${pesoApontado} kg do Lote ${loteConsultadoTemp.lote_fornecedor} alocados na OP ${op}.`);
             
-            // Sugere a mesma OP na tela de devolução para facilitar a vida do operador depois
+            // Sugere a mesma OP na tela de devolução para facilitar a vida do operador
             document.getElementById('dev-op').value = op;
 
             document.getElementById('abs-barcode').value = '';
@@ -190,7 +190,7 @@ async function confirmarAbastecimentoLote() {
     }
 }
 
-// --- FLUXO 2: DEVOLUÇÃO / TRANSFERÊNCIA (AGORA POR OP) ---
+// --- FLUXO 2: DEVOLUÇÃO / TRANSFERÊNCIA ---
 
 async function buscarLoteAtivoDevolucao() {
     const op = document.getElementById('dev-op').value.trim();
@@ -275,6 +275,43 @@ function calcularPesoDevolucao() {
     document.getElementById('dev-peso-manual').value = pesoEstimado.toFixed(2);
 }
 
+// NOVA FUNÇÃO: Calculadora de apoio para Transferência Sistêmica
+function calcularPesoTransferencia() {
+    if (!consumoAtivoDevolucao) return;
+
+    let pesoTotal = 0;
+    
+    // 1. Calcula bobinas inteiras
+    const qtdInteiras = parseInt(document.getElementById('dev-sist-qtd-inteiras').value) || 0;
+    const pesoUnitario = parseFloat(consumoAtivoDevolucao.peso_unitario_kg) || 0;
+    pesoTotal += (qtdInteiras * pesoUnitario);
+
+    // 2. Calcula bobina parcial
+    const diamExtCm = parseFloat(document.getElementById('dev-sist-diam-ext').value) || 0;
+    const diamTubCm = parseFloat(document.getElementById('dev-sist-diam-tub').value) || 0;
+    const fatorConversao = parseFloat(consumoAtivoDevolucao.fator_conversao) || 0;
+
+    if (diamExtCm > 0 && diamTubCm > 0 && fatorConversao > 0) {
+        const raioExt = diamExtCm / 2;
+        const raioTub = diamTubCm / 2;
+        const areaCoroa = (Math.pow(raioExt, 2) - Math.pow(raioTub, 2)) * 3.1416;
+        let pesoParcial = areaCoroa * fatorConversao;
+        if (pesoParcial > 0) {
+            pesoTotal += pesoParcial;
+        }
+    }
+
+    // 3. Atualiza o campo final editável
+    if (pesoTotal > 0) {
+        document.getElementById('dev-peso-transferido').value = pesoTotal.toFixed(2);
+    } else {
+        // Limpa se o usuário apagou os campos do ajudante, para não sobrescrever se ele estiver digitando manualmente
+        if (document.getElementById('dev-sist-qtd-inteiras').value === '' && document.getElementById('dev-sist-diam-ext').value === '') {
+             document.getElementById('dev-peso-transferido').value = '';
+        }
+    }
+}
+
 async function executarDevolucao() {
     const consumoId = parseInt(document.getElementById('dev-consumo-id').value);
     const tipo = document.getElementById('dev-tipo-operacao').value;
@@ -312,7 +349,7 @@ async function executarDevolucao() {
         const pesoTransferido = parseFloat(document.getElementById('dev-peso-transferido').value);
 
         if (!novaOP || isNaN(pesoTransferido) || pesoTransferido <= 0) {
-            return alert("Informe a nova OP destino e a quantidade mantida na máquina!");
+            return alert("Informe a nova OP destino e a quantidade final (kg) mantida na máquina!");
         }
 
         try {
@@ -340,7 +377,6 @@ async function executarDevolucao() {
 }
 
 function resetarTelaDevolucao() {
-    // Mantemos a OP (dev-op) intacta, caso ele vá devolver outro lote da mesma OP.
     document.getElementById('dev-barcode').value = '';
     document.getElementById('dev-diam-ext').value = '';
     document.getElementById('dev-diam-tub').value = '9.45';
@@ -348,8 +384,15 @@ function resetarTelaDevolucao() {
     document.getElementById('dev-peso-etiqueta').value = '';
     document.getElementById('dev-peso-calculado').innerText = '0.00 kg';
     document.getElementById('dev-peso-manual').value = '';
+    
     document.getElementById('dev-nova-op').value = '';
     document.getElementById('dev-peso-transferido').value = '';
+    
+    // Limpar novos campos da calculadora de transferência
+    document.getElementById('dev-sist-qtd-inteiras').value = '';
+    document.getElementById('dev-sist-diam-ext').value = '';
+    document.getElementById('dev-sist-diam-tub').value = '9.45';
+
     document.getElementById('painel-devolucao').classList.add('escondido');
     consumoAtivoDevolucao = null;
 }
