@@ -245,9 +245,16 @@
     <div id="tela-admin" class="escondido aba-conteudo">
         <h2 style="text-align: left; margin-bottom: 24px;">Gestão de Cadastros</h2>
         
+        <!-- IMPORTADOR AUTOMÁTICO DO XML SB8 DO TOTVS -->
         <div class="card">
-            <h3>Entrada de Lotes no Estoque</h3>
-            <button class="btn-dash" onclick="abrirModal('modal-lote')">+ Cadastrar Nova Bobina/Lote</button>
+            <h3>📥 Importar XML SB8 (TOTVS Protheus)</h3>
+            <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">Selecione o arquivo XML exportado da rotina SB8 do TOTVS Protheus.</p>
+            <div class="form-group">
+                <input type="file" id="upload-xml-totvs" accept=".xml,.ssml" style="padding:10px;">
+            </div>
+            <button class="btn-blue" onclick="processarArquivoTotvs()">Processar e Importar Lotes Ativos</button>
+            <div style="border-top:1px dashed var(--border-color); margin:15px 0;"></div>
+            <button class="btn-dash" onclick="abrirModal('modal-lote')">+ Cadastrar Nova Bobina/Lote Manualmente</button>
         </div>
 
         <div class="card">
@@ -266,7 +273,7 @@
     <!-- MENU INFERIOR -->
     <nav class="nav-inferior escondido" id="menu-navegacao">
         <button class="nav-item ativo" id="nav-abastecer" onclick="navegarPara('abastecer')"><div class="icon">🔗</div>Setar MP</button>
-        <button class="nav-item" id="nav-devolver" onclick="navegarPara('devolver')"><div class="icon">⚖️</div>Devolver</button>
+        <button class="nav-item" id="nav-devolver" onclick="navegarPara('devolver')"><div class="icon">秤️</div>Devolver</button>
         <button class="nav-item" id="nav-refugo" onclick="navegarPara('refugo')"><div class="icon">🗑️</div>Refugo</button>
         <button class="nav-item restrito-lider-adm escondido" id="nav-visao" onclick="navegarPara('visao')"><div class="icon">📊</div>Visão OP</button>
         <button class="nav-item restrito-lider-adm escondido" id="nav-admin" onclick="navegarPara('admin')"><div class="icon">⚙️</div>Gestão</button>
