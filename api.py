@@ -518,7 +518,6 @@ def visao_ordem_detalhe(op: str):
 
 # --- ADMIN E CADASTROS ---
 
-# NOVO ENDPOINT DE LIMPEZA DO ESTOQUE
 @app.post("/admin/estoque/limpar")
 def limpar_estoque():
     conn = None
@@ -619,10 +618,12 @@ def importar_lotes_massa(lotes: List[ItemImportacaoMassa]):
             # Pega a descricao vinda do Excel se tiver, senao coloca padrão
             desc_mat = item.descricao_material.strip() if item.descricao_material else f"Material {cod_mat} (Importado)"
 
+            # AGORA ELE ATUALIZA A DESCRIÇÃO SE JÁ EXISTIR NO BANCO
             cursor.execute("""
                 INSERT INTO master_materiais (codigo_material, descricao, tipo_material, peso_tubete_padrao, peso_unitario_kg, fator_conversao)
                 VALUES (%s, %s, 'bobina', 0.00, 0.00, 0.00)
-                ON CONFLICT (codigo_material) DO NOTHING;
+                ON CONFLICT (codigo_material) 
+                DO UPDATE SET descricao = EXCLUDED.descricao;
             """, (cod_mat, desc_mat))
 
             cursor.execute("""
