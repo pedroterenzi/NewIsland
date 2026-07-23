@@ -33,6 +33,7 @@
             width: 100%; height: 50px; padding: 0 16px; background: #0b1120; border: 1px solid #334155; border-radius: 12px; color: white; font-size: 15px; transition: all 0.3s ease; -webkit-appearance: none; appearance: none; box-sizing: border-box;
         }
         .form-group select { background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 16px center; background-size: 18px; padding-right: 40px; }
+        .form-group select optgroup { background: #0b1120; color: var(--accent-orange); font-weight: 700; }
         .form-group input:focus, .form-group select:focus { border-color: var(--accent-blue); outline: none; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
         
         h2, h3, h4 { color: #ffffff; margin-top: 0; font-weight: 700; letter-spacing: -0.5px; }
@@ -107,6 +108,41 @@
         <div class="form-group"><label>Usuário:</label><input type="text" id="login-usuario" placeholder="Digite seu login"></div>
         <div class="form-group"><label>Senha:</label><input type="password" id="login-senha" placeholder="Digite sua senha"></div>
         <button class="btn-blue" id="btn-entrar" onclick="executarLogin()" style="margin-top: 10px;">Acessar Sistema</button>
+        
+        <div style="text-align: center; margin-top: 25px; border-top: 1px solid var(--border-color); padding-top: 20px;">
+            <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 8px;">Não tem login?</p>
+            <button class="btn-dash" onclick="mostrarCadastro()" style="padding: 12px; margin-bottom: 0;">Clique aqui e cadastre-se</button>
+        </div>
+    </div>
+
+    <!-- TELA DE CADASTRO -->
+    <div id="tela-cadastro" class="card escondido" style="margin-top: 5vh;">
+        <h2 style="color: var(--accent-orange);">Criar Conta</h2>
+        <p style="text-align:center; color:var(--text-muted); font-size: 13px; margin-bottom: 24px;">Preencha os dados abaixo e selecione seu cargo.</p>
+        
+        <div class="form-group"><label>Nome Completo:</label><input type="text" id="reg-nome" placeholder="Ex: João da Silva"></div>
+        <div class="form-group"><label>Usuário (Login):</label><input type="text" id="reg-usuario" placeholder="Nome que usará para entrar"></div>
+        <div class="form-group"><label>Senha:</label><input type="password" id="reg-senha" placeholder="Crie uma senha segura"></div>
+        <div class="form-group">
+            <label>Qual o seu cargo?</label>
+            <select id="reg-cargo">
+                <optgroup label="Acesso Restrito (Chão de Fábrica)">
+                    <option value="1">Operador 1</option>
+                    <option value="1">Operador 2</option>
+                    <option value="1">Operador 3</option>
+                    <option value="1">Técnico de produção</option>
+                    <option value="1">Auxiliar de produção</option>
+                </optgroup>
+                <optgroup label="Acesso Total (Gestão e Análise)">
+                    <option value="2">Analista de Produção</option>
+                    <option value="2">Supervisor de produção</option>
+                    <option value="2">Coordenador de Produção</option>
+                    <option value="2">Gerente de produção</option>
+                </optgroup>
+            </select>
+        </div>
+        <button class="btn-orange" onclick="executarCadastro()" style="margin-top: 10px;">Cadastrar Usuário</button>
+        <button class="btn-dash" onclick="mostrarLogin()" style="margin-top: 15px; margin-bottom: 0; border-color: var(--border-color); color: var(--text-muted);">Voltar para o Login</button>
     </div>
 
     <!-- ABA 1: ABASTECER MÁQUINA (SETAR MP) -->
@@ -377,7 +413,7 @@
         </div>
     </div>
 
-    <!-- MENU INFERIOR (ATUALIZADO) -->
+    <!-- MENU INFERIOR -->
     <nav class="nav-inferior escondido" id="menu-navegacao">
         <button class="nav-item ativo" id="nav-abastecer" onclick="navegarPara('abastecer')"><div class="icon">🔗</div>Setar MP</button>
         <button class="nav-item" id="nav-devolver" onclick="navegarPara('devolver')"><div class="icon">⚖️</div>Devolver</button>
