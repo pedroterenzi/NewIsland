@@ -5,6 +5,47 @@ let MESTRE_MATERIAIS = [], MESTRE_MAQUINAS = [];
 let loteConsultadoTemp = null;
 let consumoAtivoDevolucao = null; 
 
+// --- CONTROLE DE LOGIN E CADASTRO ---
+
+function mostrarCadastro() {
+    document.getElementById('tela-login').classList.add('escondido');
+    document.getElementById('tela-cadastro').classList.remove('escondido');
+}
+
+function mostrarLogin() {
+    document.getElementById('tela-cadastro').classList.add('escondido');
+    document.getElementById('tela-login').classList.remove('escondido');
+}
+
+async function executarCadastro() {
+    const nome = document.getElementById('reg-nome').value.trim();
+    const login = document.getElementById('reg-usuario').value.trim();
+    const senha = document.getElementById('reg-senha').value.trim();
+    const nivel = parseInt(document.getElementById('reg-cargo').value);
+
+    if (!nome || !login || !senha) return alert("Por favor, preencha todos os campos do cadastro!");
+
+    try {
+        const res = await fetch(`${API_URL}/admin/usuarios`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ login, senha, nome, nivel })
+        });
+
+        if (res.ok) {
+            alert("Conta criada com sucesso! Faça login com os dados que você acabou de criar.");
+            mostrarLogin();
+            document.getElementById('login-usuario').value = login;
+            document.getElementById('login-senha').value = '';
+        } else {
+            const err = await res.json();
+            alert(`Ops, ocorreu um erro: ${err.detail || 'Não foi possível criar o usuário.'}`);
+        }
+    } catch(e) {
+        alert("Erro ao conectar com o servidor para criar a conta.");
+    }
+}
+
 async function executarLogin() {
     const login = document.getElementById('login-usuario').value.trim();
     const senha = document.getElementById('login-senha').value.trim();
@@ -37,11 +78,11 @@ function sair() { location.reload(); }
 
 async function inicializarPainel() {
     document.getElementById('tela-login').classList.add('escondido');
+    document.getElementById('tela-cadastro').classList.add('escondido');
     document.getElementById('menu-navegacao').classList.remove('escondido');
     
     document.getElementById('txt-user').innerText = `Operador: ${usuarioLogado.nome}`;
     
-    // Preenche os campos de operador com o nome logado para facilitar
     document.getElementById('abs-operador').value = usuarioLogado.nome;
     document.getElementById('dev-operador').value = usuarioLogado.nome;
     document.getElementById('ref-operador').value = usuarioLogado.nome;
@@ -482,7 +523,7 @@ async function buscarDetalhesVisaoOP() {
     }
 }
 
-// --- HISTÓRICO DE MOVIMENTAÇÕES ---
+// --- HISTÓRICO DE MOVIMENTAÇÕES (COM AJUSTE DE FUSO HORÁRIO) ---
 
 async function buscarHistoricoOP() {
     const op = document.getElementById('busca-hist-op').value.trim();
@@ -504,7 +545,6 @@ async function buscarHistoricoOP() {
 
             let htmlCards = '';
             historico.forEach(h => {
-                // Configura estilo da badge dependendo do tipo
                 let cssClass = 'bg-transf';
                 if (h.tipo_movimentacao.includes('ABASTECIMENTO') || h.tipo_movimentacao.includes('ENTRADA')) {
                     cssClass = 'bg-entrada';
@@ -512,8 +552,15 @@ async function buscarHistoricoOP() {
                     cssClass = 'bg-saida';
                 }
 
-                // Formatar Data
-                const dataFormatada = new Date(h.data_hora).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+                // *** MÁGICA DO FUSO HORÁRIO DE BRASÍLIA ***
+                // O banco Neon sempre envia o horário como UTC Universal.
+                // Se adicionarmos o 'Z' no final, forçamos o navegador a entender que é UTC
+                // e o navegador faz a conversão certinha para o fuso do celular/computador de quem tá usando.
+                let horaUTC = h.data_hora;
+                if (!horaUTC.endsWith('Z')) {
+                    horaUTC += 'Z';
+                }
+                const dataFormatada = new Date(horaUTC).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 
                 htmlCards += `
                     <div class="card" style="padding: 16px; margin-bottom: 12px; background: rgba(255,255,255,0.02);">
@@ -714,7 +761,6 @@ function processarPlanilhaParametros() {
     reader.readAsArrayBuffer(file);
 }
 
-
 // --- PARSER E IMPORTADOR NATIVO DE SALDOS POR LOTE (EXCEL MTR425) ---
 
 function tratarNumeroTotvs(valorTexto) {
@@ -837,7 +883,7 @@ async function processarArquivoLotesExcel() {
                 fileInput.value = '';
                 if (chkLimpar) chkLimpar.checked = false; 
                 await baixarDadosMestres();
-                renderizarGestao(); // Atualiza a aba de materiais após importar
+                renderizarGestao(); 
             } else {
                 const err = await res.json();
                 alert(`Erro ao importar lotes: ${err.detail}`);
