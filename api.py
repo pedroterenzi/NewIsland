@@ -105,7 +105,7 @@ def inicializar_banco():
             );
         """)
 
-        # 7. NOVO: Histórico Geral de Movimentações (Auditoria)
+        # 7. Histórico Geral de Movimentações (Auditoria)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS historico_movimentacoes (
                 id SERIAL PRIMARY KEY,
@@ -204,6 +204,11 @@ class ModelRefugo(BaseModel):
     peso_refugo_kg: float
     tipo_refugo: str
     operador: str
+
+class ModelEdicaoMovimento(BaseModel):
+    quantidade_kg: float
+    operador: str
+    detalhes: str
 
 class ItemImportacaoMassa(BaseModel):
     codigo_barras_lote: str
@@ -353,9 +358,9 @@ def confirmar_abastecimento(obj: ModelAbastecerConfirmar):
 
         # Insere o Consumo
         cursor.execute("""
-            INSERT INTO consumo_op_lote (ordem_producao, maquina_numero, codigo_barras_lote, peso_alocado, operador)
-            VALUES (%s, %s, %s, %s, %s) RETURNING id;
-        """, (obj.ordem_producao.strip(), obj.maquina_numero, obj.codigo_barras_lote.strip(), peso_apontado, obj.operador.strip()))
+            INSERT INTO consumo_op_lote (ordem_producao, maquina_numero, codigo_barras_lote, peso_alocado, consumo_real, operador)
+            VALUES (%s, %s, %s, %s, %s, %s) RETURNING id;
+        """, (obj.ordem_producao.strip(), obj.maquina_numero, obj.codigo_barras_lote.strip(), peso_apontado, peso_apontado, obj.operador.strip()))
         
         # Grava Histórico de Movimentação (AUDITORIA)
         cursor.execute("""
@@ -474,9 +479,9 @@ def transferir_sistemico_op(obj: ModelDevolucaoSistemica):
         """, (peso_transferido, consumo_real_origem, obj.nova_ordem_destino.strip(), obj.consumo_id))
 
         cursor.execute("""
-            INSERT INTO consumo_op_lote (ordem_producao, maquina_numero, codigo_barras_lote, peso_alocado, operador)
-            VALUES (%s, %s, %s, %s, %s);
-        """, (obj.nova_ordem_destino.strip(), consumo_origem['maquina_numero'], consumo_origem['codigo_barras_lote'], peso_transferido, obj.operador.strip()))
+            INSERT INTO consumo_op_lote (ordem_producao, maquina_numero, codigo_barras_lote, peso_alocado, consumo_real, operador)
+            VALUES (%s, %s, %s, %s, %s, %s);
+        """, (obj.nova_ordem_destino.strip(), consumo_origem['maquina_numero'], consumo_origem['codigo_barras_lote'], peso_transferido, peso_transferido, obj.operador.strip()))
 
         # Grava Histórico de Movimentação DUPLO (Saída e Entrada)
         cursor.execute("""
@@ -563,18 +568,39 @@ def visao_ordem_detalhe(op: str):
         if conn:
             conn.close()
 
-# --- NOVO: HISTÓRICO DE MOVIMENTAÇÕES (AUDITORIA) ---
-@app.get("/historico-movimentacoes/{op}")
-def historico_movimentacoes_por_op(op: str):
+# --- NOVO: HISTÓRICO DE MOVIMENTAÇÕES (FILTROS) E EDIÇÃO ---
+
+@app.get("/historico-movimentacoes")
+def buscar_historico(
+    op: Optional[str] = None,
+    lote: Optional[str] = None,
+    operador: Optional[str] = None,
+    tipo: Optional[str] = None
+):
     conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
-        cursor.execute("""
-            SELECT * FROM historico_movimentacoes 
-            WHERE ordem_producao = %s 
-            ORDER BY data_hora DESC;
-        """, (op.strip(),))
+        
+        query = "SELECT * FROM historico_movimentacoes WHERE 1=1"
+        params = []
+        
+        if op:
+            query += " AND ordem_producao ILIKE %s"
+            params.append(f"%{op.strip()}%")
+        if lote:
+            query += " AND codigo_barras_lote ILIKE %s"
+            params.append(f"%{lote.strip()}%")
+        if operador:
+            query += " AND operador ILIKE %s"
+            params.append(f"%{operador.strip()}%")
+        if tipo:
+            query += " AND tipo_movimentacao ILIKE %s"
+            params.append(f"%{tipo.strip()}%")
+            
+        query += " ORDER BY data_hora DESC LIMIT 500;"
+        
+        cursor.execute(query, tuple(params))
         dados = cursor.fetchall()
         cursor.close()
         return dados
@@ -582,6 +608,72 @@ def historico_movimentacoes_por_op(op: str):
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         if conn: conn.close()
+
+@app.put("/admin/movimentacoes/{hist_id}/editar")
+def editar_movimentacao(hist_id: int, obj: ModelEdicaoMovimento):
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Busca o histórico original para ver o que mudou
+        cursor.execute("SELECT * FROM historico_movimentacoes WHERE id = %s", (hist_id,))
+        hist = cursor.fetchone()
+        if not hist: raise HTTPException(status_code=404, detail="Movimentação não encontrada.")
+        
+        old_qtd = float(hist['quantidade_kg'])
+        new_qtd = float(obj.quantidade_kg)
+        diff = new_qtd - old_qtd
+        
+        tipo = hist['tipo_movimentacao']
+        op = hist['ordem_producao']
+        lote = hist['codigo_barras_lote']
+        
+        # INTELIGÊNCIA DE CORREÇÃO: Ajusta saldos de OP e Estoque retroativamente se houver diferença de peso
+        if diff != 0:
+            if tipo == 'ABASTECIMENTO' and lote:
+                # O operador alocou mais/menos do que deveria.
+                cursor.execute("""
+                    UPDATE consumo_op_lote 
+                    SET peso_alocado = peso_alocado + %s, consumo_real = consumo_real + %s 
+                    WHERE ordem_producao = %s AND codigo_barras_lote = %s AND status IN ('em_uso', 'devolvido_estoque', 'transferido')
+                """, (diff, diff, op, lote))
+                
+                cursor.execute("""
+                    UPDATE lotes_estoque SET peso_atual = peso_atual - %s WHERE codigo_barras_lote = %s
+                """, (diff, lote))
+                
+            elif tipo == 'DEVOLUÇÃO FÍSICA' and lote:
+                # O operador devolveu mais/menos do que deveria.
+                cursor.execute("""
+                    UPDATE consumo_op_lote 
+                    SET peso_devolvido = peso_devolvido + %s, consumo_real = consumo_real - %s 
+                    WHERE ordem_producao = %s AND codigo_barras_lote = %s AND status = 'devolvido_estoque'
+                """, (diff, diff, op, lote))
+                
+                cursor.execute("""
+                    UPDATE lotes_estoque SET peso_atual = peso_atual + %s WHERE codigo_barras_lote = %s
+                """, (diff, lote))
+
+        # Atualiza a linha de auditoria (Histórico)
+        cursor.execute("""
+            UPDATE historico_movimentacoes 
+            SET quantidade_kg = %s, operador = %s, detalhes = %s 
+            WHERE id = %s
+        """, (new_qtd, obj.operador.strip(), obj.detalhes.strip(), hist_id))
+        
+        conn.commit()
+        cursor.close()
+        return {"status": "sucesso"}
+    except HTTPException as h:
+        if conn: conn.rollback()
+        raise h
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: conn.close()
+
 
 # --- ADMIN E CADASTROS ---
 
