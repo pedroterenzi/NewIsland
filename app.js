@@ -172,9 +172,11 @@ async function buscarDetalhesEtiqueta() {
             document.getElementById('prev-lote').innerText = loteConsultadoTemp.lote_fornecedor;
             document.getElementById('prev-peso').innerText = `${loteConsultadoTemp.peso_atual} kg`;
             
-            document.getElementById('abs-peso-apontar').value = loteConsultadoTemp.peso_atual;
+            // REMOVIDO PARA EVITAR ERROS (POKA-YOKE) -> Deixa o input em branco para o operador digitar do zero.
+            // document.getElementById('abs-peso-apontar').value = loteConsultadoTemp.peso_atual; 
             
             document.getElementById('preview-lote-box').classList.remove('escondido');
+            document.getElementById('abs-peso-apontar').focus(); // Foca no campo pro cara já digitar
         } else {
             const err = await res.json();
             alert(`Erro: ${err.detail}`);
@@ -194,7 +196,7 @@ async function confirmarAbastecimentoLote() {
 
     if (!op) return alert("Digite a Ordem de Produção (OP) antes de confirmar!");
     if (!loteConsultadoTemp) return alert("Bipa a etiqueta de matéria-prima primeiro!");
-    if (isNaN(pesoApontado) || pesoApontado <= 0) return alert("Digite um peso válido para apontar!");
+    if (isNaN(pesoApontado) || pesoApontado <= 0) return alert("Atenção! Você precisa digitar a quantidade (KG) correta no campo vazio.");
     if (pesoApontado > parseFloat(loteConsultadoTemp.peso_atual)) {
         return alert(`Você não pode apontar ${pesoApontado}kg pois o lote tem apenas ${loteConsultadoTemp.peso_atual}kg disponíveis!`);
     }
@@ -216,7 +218,7 @@ async function confirmarAbastecimentoLote() {
             alert(`Sucesso! ${pesoApontado} kg do Lote ${loteConsultadoTemp.lote_fornecedor} alocados na OP ${op}.`);
             document.getElementById('dev-op').value = op;
             document.getElementById('busca-visao-op').value = op;
-            document.getElementById('busca-hist-op').value = op;
+            document.getElementById('filtro-hist-op').value = op;
             document.getElementById('abs-barcode').value = '';
             document.getElementById('abs-peso-apontar').value = '';
             document.getElementById('preview-lote-box').classList.add('escondido');
@@ -523,23 +525,32 @@ async function buscarDetalhesVisaoOP() {
     }
 }
 
-// --- HISTÓRICO DE MOVIMENTAÇÕES (COM AJUSTE DE FUSO HORÁRIO) ---
+// --- HISTÓRICO DE MOVIMENTAÇÕES (FILTROS E EDIÇÃO) ---
 
-async function buscarHistoricoOP() {
-    const op = document.getElementById('busca-hist-op').value.trim();
-    if (!op) return alert("Digite o número da OP para buscar o histórico!");
+async function buscarHistoricoGeral() {
+    const op = document.getElementById('filtro-hist-op').value.trim();
+    const lote = document.getElementById('filtro-hist-lote').value.trim();
+    const operador = document.getElementById('filtro-hist-operador').value.trim();
+    const tipo = document.getElementById('filtro-hist-tipo').value;
 
     const divResultado = document.getElementById('resultado-historico-op');
     divResultado.classList.remove('escondido');
-    divResultado.innerHTML = `<p style="text-align:center; color:var(--text-muted);">Buscando histórico...</p>`;
+    divResultado.innerHTML = `<p style="text-align:center; color:var(--text-muted);">Buscando e aplicando filtros...</p>`;
+
+    // Constrói a URL com os parâmetros de pesquisa
+    let queryUrl = `${API_URL}/historico-movimentacoes?`;
+    if (op) queryUrl += `op=${encodeURIComponent(op)}&`;
+    if (lote) queryUrl += `lote=${encodeURIComponent(lote)}&`;
+    if (operador) queryUrl += `operador=${encodeURIComponent(operador)}&`;
+    if (tipo) queryUrl += `tipo=${encodeURIComponent(tipo)}&`;
 
     try {
-        const res = await fetch(`${API_URL}/historico-movimentacoes/${encodeURIComponent(op)}`);
+        const res = await fetch(queryUrl);
         if (res.ok) {
             const historico = await res.json();
             
             if (historico.length === 0) {
-                divResultado.innerHTML = `<p style="text-align:center; color:var(--accent-orange);">Nenhum histórico registrado para a OP ${op}.</p>`;
+                divResultado.innerHTML = `<p style="text-align:center; color:var(--accent-orange);">Nenhum apontamento corresponde a esses filtros.</p>`;
                 return;
             }
 
@@ -553,14 +564,17 @@ async function buscarHistoricoOP() {
                 }
 
                 // *** MÁGICA DO FUSO HORÁRIO DE BRASÍLIA ***
-                // O banco Neon sempre envia o horário como UTC Universal.
-                // Se adicionarmos o 'Z' no final, forçamos o navegador a entender que é UTC
-                // e o navegador faz a conversão certinha para o fuso do celular/computador de quem tá usando.
                 let horaUTC = h.data_hora;
-                if (!horaUTC.endsWith('Z')) {
-                    horaUTC += 'Z';
-                }
+                if (!horaUTC.endsWith('Z')) { horaUTC += 'Z'; }
                 const dataFormatada = new Date(horaUTC).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+
+                // Renderiza o botão de editar APENAS para os cargos gerenciais (Nível >= 2)
+                let btnEditar = '';
+                if (parseInt(usuarioLogado.nivel) >= 2) {
+                    // Passa os dados para a função de abrir o modal
+                    const funcEditar = `abrirModalEdicaoMovimento(${h.id}, '${h.tipo_movimentacao}', ${h.quantidade_kg}, '${h.operador.replace(/'/g, "\\'")}', '${(h.detalhes || '').replace(/'/g, "\\'")}')`;
+                    btnEditar = `<button class="btn-small-edit" onclick="${funcEditar}">Editar Qtd / Responsável</button>`;
+                }
 
                 htmlCards += `
                     <div class="card" style="padding: 16px; margin-bottom: 12px; background: rgba(255,255,255,0.02);">
@@ -579,11 +593,12 @@ async function buscarHistoricoOP() {
                             </div>
                         </div>
                         <div style="font-size: 13px;">
-                            <span style="color:var(--text-muted);">Lote/Etiqueta:</span><br>
-                            <strong style="color:#fff;">${h.codigo_barras_lote || 'N/A'}</strong>
+                            <span style="color:var(--text-muted);">OP/Lote:</span><br>
+                            <strong style="color:#fff;">OP: ${h.ordem_producao} | Etiqueta: ${h.codigo_barras_lote || 'N/A'}</strong>
                         </div>
-                        <div style="font-size: 12px; color: var(--text-muted); margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.05);">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 12px; color: var(--text-muted); margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.05);">
                             <i>${h.detalhes || ''}</i>
+                            ${btnEditar}
                         </div>
                     </div>
                 `;
@@ -600,6 +615,49 @@ async function buscarHistoricoOP() {
         divResultado.innerHTML = `<p style="text-align:center; color:var(--danger-color);">Erro de conexão ao servidor.</p>`;
     }
 }
+
+function abrirModalEdicaoMovimento(id, tipo, qtdAtual, operador, detalhes) {
+    document.getElementById('edit-hist-id').value = id;
+    document.getElementById('edit-hist-tipo').value = tipo;
+    document.getElementById('edit-hist-qtd').value = qtdAtual;
+    document.getElementById('edit-hist-operador').value = operador;
+    document.getElementById('edit-hist-detalhes').value = detalhes;
+    
+    abrirModal('modal-editar-movimento');
+}
+
+async function salvarEdicaoMovimento() {
+    const id = document.getElementById('edit-hist-id').value;
+    const qtdNova = parseFloat(document.getElementById('edit-hist-qtd').value);
+    const operador = document.getElementById('edit-hist-operador').value.trim();
+    const detalhes = document.getElementById('edit-hist-detalhes').value.trim();
+
+    if (isNaN(qtdNova) || qtdNova < 0) return alert("Digite uma quantidade válida!");
+
+    try {
+        const res = await fetch(`${API_URL}/admin/movimentacoes/${id}/editar`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                quantidade_kg: qtdNova,
+                operador: operador,
+                detalhes: detalhes
+            })
+        });
+
+        if (res.ok) {
+            alert("Correção salva com sucesso! Os saldos do Lote e da OP foram recalculados e reajustados para corrigir o erro.");
+            fecharModal('modal-editar-movimento');
+            buscarHistoricoGeral(); // Recarrega os filtros atuais para mostrar a mudança
+        } else {
+            const err = await res.json();
+            alert(`Erro ao editar: ${err.detail}`);
+        }
+    } catch (e) {
+        alert("Erro de conexão ao editar apontamento.");
+    }
+}
+
 
 // --- ADMIN / CADASTROS ---
 
