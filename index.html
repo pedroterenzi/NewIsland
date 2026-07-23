@@ -50,7 +50,9 @@
         .btn-dash:hover { background: rgba(59, 130, 246, 0.1); }
         
         .btn-small-delete { background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); padding: 10px 14px; border-radius: 10px; font-size: 12px; font-weight: 600; cursor: pointer; transition: 0.2s;}
-        
+        .btn-small-edit { background: rgba(59, 130, 246, 0.1); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.2); padding: 6px 12px; border-radius: 8px; font-size: 11px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .btn-small-edit:hover { background: rgba(59, 130, 246, 0.2); }
+
         .item-list { background: #0f172a; border: 1px solid #1e293b; padding: 18px; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;}
         
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -189,8 +191,9 @@
                 
                 <div class="form-group">
                     <label style="color: #fff; font-size: 14px;">Quantidade a Apontar (kg):</label>
-                    <input type="number" id="abs-peso-apontar" step="0.1" placeholder="Quantos kg você pegou do palete?">
-                    <p style="font-size: 11px; color: var(--accent-orange); margin-top: 4px;">*Pode apontar o palete/caixa inteira se preferir. A devolução real será feita no final.</p>
+                    <!-- CAMPO EM BRANCO PARA FORÇAR O OPERADOR A DIGITAR -->
+                    <input type="number" id="abs-peso-apontar" step="0.1" placeholder="Digite exatamente quantos KG está pegando">
+                    <p style="font-size: 11px; color: var(--accent-orange); margin-top: 4px;">*Para evitar erros, preencha manualmente a quantidade consumida.</p>
                 </div>
 
                 <button class="btn-orange" id="btn-confirmar-abastecimento" onclick="confirmarAbastecimentoLote()" style="margin-top:15px;">Gravar Apontamento na OP</button>
@@ -350,16 +353,26 @@
     <!-- ABA 5: HISTÓRICO DE MOVIMENTAÇÕES -->
     <div id="tela-historico" class="escondido aba-conteudo">
         <h2 style="text-align: left; margin-bottom: 8px;">Histórico de Movimentações</h2>
-        <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 24px;">Visualize todas as ações realizadas vinculadas a uma OP.</p>
+        <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 24px;">Filtre os apontamentos. Gestores podem editar a quantidade para corrigir erros operacionais.</p>
 
         <div class="card">
-            <div class="form-group">
-                <label>Número da Ordem de Produção (OP):</label>
-                <div style="display: flex; gap: 10px;">
-                    <input type="text" id="busca-hist-op" placeholder="Ex: OP-2026-001" style="flex: 1;">
-                    <button class="btn-orange" style="width: auto; padding: 0 20px;" onclick="buscarHistoricoOP()">Buscar Histórico</button>
+            <h3>Filtros de Busca</h3>
+            <div class="grid-2">
+                <div class="form-group"><label>Número da OP:</label><input type="text" id="filtro-hist-op" placeholder="Ex: OP-2026-001"></div>
+                <div class="form-group"><label>Lote / Etiqueta:</label><input type="text" id="filtro-hist-lote" placeholder="Lote do fornecedor ou código"></div>
+                <div class="form-group"><label>Operador:</label><input type="text" id="filtro-hist-operador" placeholder="Nome do usuário"></div>
+                <div class="form-group">
+                    <label>Tipo de Movimento:</label>
+                    <select id="filtro-hist-tipo">
+                        <option value="">TODOS</option>
+                        <option value="ABASTECIMENTO">Abastecimento na Máquina</option>
+                        <option value="DEVOLUÇÃO FÍSICA">Devolução ao Estoque</option>
+                        <option value="TRANSFERÊNCIA">Transferência Sistêmica</option>
+                        <option value="REFUGO">Apontamento de Refugo</option>
+                    </select>
                 </div>
             </div>
+            <button class="btn-orange" onclick="buscarHistoricoGeral()" style="margin-top: 10px;">Aplicar Filtros e Buscar</button>
         </div>
 
         <div id="resultado-historico-op" class="escondido"></div>
@@ -475,6 +488,36 @@
         </div>
         <button class="btn-blue" onclick="salvarMaquina()" style="margin-top: 8px;">Salvar Máquina</button>
         <button class="btn-dash" style="margin-top:12px; border-color:var(--text-muted); color:var(--text-muted);" onclick="fecharModal('modal-maq')">Cancelar</button>
+    </div>
+</div>
+
+<!-- MODAL: EDITAR MOVIMENTAÇÃO (CORRIGIR ERRO) -->
+<div id="modal-editar-movimento" class="modal-overlay escondido">
+    <div class="modal-content">
+        <h3>Editar Movimentação (Auditoria)</h3>
+        <p style="font-size:12px; color:var(--text-muted); margin-bottom:15px;">Ao alterar a quantidade, o saldo da OP e do Estoque serão reajustados automaticamente para refletir a correção.</p>
+        
+        <input type="hidden" id="edit-hist-id">
+        
+        <div class="form-group">
+            <label>Tipo do Movimento:</label>
+            <input type="text" id="edit-hist-tipo" disabled style="color:var(--text-muted);">
+        </div>
+        <div class="form-group">
+            <label style="color: var(--accent-orange);">Quantidade Real (kg):</label>
+            <input type="number" id="edit-hist-qtd" step="0.01">
+        </div>
+        <div class="form-group">
+            <label>Operador Responsável:</label>
+            <input type="text" id="edit-hist-operador">
+        </div>
+        <div class="form-group">
+            <label>Detalhes da Correção (Justificativa):</label>
+            <input type="text" id="edit-hist-detalhes" placeholder="Ex: Operador digitou 1000 ao invés de 100">
+        </div>
+        
+        <button class="btn-orange" onclick="salvarEdicaoMovimento()" style="margin-top: 8px;">Salvar Correção</button>
+        <button class="btn-dash" style="margin-top:12px; border-color:var(--text-muted); color:var(--text-muted);" onclick="fecharModal('modal-editar-movimento')">Cancelar</button>
     </div>
 </div>
 
